@@ -68,3 +68,48 @@ def R.lim_spec (X : Nat → R) (h : R.RegSeq X) (n : Nat) : R.Dist (X n) (R.lim 
              ≈ Q.invS n + (Q.invS K + Q.invS K) + Q.invS k + 4 * Q.invS j)))
       (Q.trans (Q.add_congr (Q.add_congr (Q.refl (Q.invS n)) (Q.invS_double k)) (Q.refl (Q.invS k)))
         (q_ring! Q.invS n + Q.invS k + Q.invS k ≈ Q.invS n + (Q.invS k + Q.invS k)))
+
+-- ## Continuity of `+` and `·`
+
+-- `|x + y - (x' + y')| ≤ e + e'`
+def R.add_dist {ω x x' y y' : R} {ω e e' : Q} (hx : R.Dist x x' e) (hy : R.Dist y y' e') : R.Dist (x + y) (x' + y') (e + e') :=
+  fun k =>
+    let a := R.addIdx k;
+    Q.chainEq _ (e + (Q.invS a + Q.invS a) + (e' + (Q.invS a + Q.invS a))) _
+      (Q.chain _ (Q.abs (x.seq a - x'.seq a) + Q.abs (y.seq a - y'.seq a)) _
+        (Q.abs_sub_add (x.seq a) (y.seq a) (x'.seq a) (y'.seq a)) (Q.add_le_add (hx a) (hy a)))
+      (Q.trans (q_ring! e + (Q.invS a + Q.invS a) + (e' + (Q.invS a + Q.invS a)) ≈ e + e' + ((Q.invS a + Q.invS a) + (Q.invS a + Q.invS a)))
+        (Q.add_congr (Q.refl (e + e')) (Q.add_congr (Q.invS_double k) (Q.invS_double k))))
+
+-- at two late indices
+def R.dist_close {ω x x' : R} {ω e : Q} (hx : R.Dist x x' e) (i i' n : Nat) (hi : Nat.Le n i) (hi' : Nat.Le n i') :
+    Q.abs (x.seq i - x'.seq i') ≤ e + 4 * Q.invS n :=
+  let a := Q.invS_anti n i hi;
+  let b := Q.invS_anti n i' hi';
+  Q.chainEq _ (Q.invS n + Q.invS n + (e + (Q.invS n + Q.invS n))) _
+    (Q.chain _ (Q.abs (x.seq i - x.seq i') + Q.abs (x.seq i' - x'.seq i')) _
+      (Q.abs_sub_le (x.seq i) (x.seq i') (x'.seq i'))
+      (Q.add_le_add (Q.le_trans (x.reg i i') (Q.add_le_add a b)) (Q.le_trans (hx i') (Q.add_le_add (Q.le_refl e) (Q.add_le_add b b)))))
+    (q_ring! Q.invS n + Q.invS n + (e + (Q.invS n + Q.invS n)) ≈ e + 4 * Q.invS n)
+
+def Q.prod_close2 (a b a' b' A B e1 e2 : Q) (ha : Q.abs a ≤ A) (hb' : Q.abs b' ≤ B)
+    (h1 : Q.abs (b - b') ≤ e1) (h2 : Q.abs (a - a') ≤ e2) : Q.abs (a * b - a' * b') ≤ A * e1 + B * e2 :=
+  Q.chain _ (Q.abs (a * (b - b')) + Q.abs (b' * (a - a'))) _
+    (Q.le_congr (Q.abs_congr (q_ring! a * (b - b') + b' * (a - a') ≈ a * b - a' * b')) (Q.refl _) (Q.abs_add _ _))
+    (Q.add_le_add (Q.mul_le_mul_abs A e1 ha h1) (Q.mul_le_mul_abs B e2 hb' h2))
+
+-- `|xy - x'y'| ≤ Bₓ e' + B_y' e`, with `Bₓ`, `B_y'` the bounds of `x` and `y'`
+def R.mul_dist {ω x x' y y' : R} {ω e e' : Q} (hx : R.Dist x x' e) (hy : R.Dist y y' e') :
+    R.Dist (x * y) (x' * y') (Q.ofNat (R.bnd x) * e' + Q.ofNat (R.bnd y') * e) :=
+  let A := Q.ofNat (R.bnd x);
+  let B := Q.ofNat (R.bnd y');
+  R.dist_of_bound (x * y) (x' * y') (A * e' + B * e) (4 * (R.bnd x + R.bnd y')) (fun n =>
+    let i := R.mulIdx x y n;
+    let i' := R.mulIdx x' y' n;
+    Q.chainEq _ (A * (e' + 4 * Q.invS n) + B * (e + 4 * Q.invS n)) _
+      (Q.prod_close2 (x.seq i) (y.seq i) (x'.seq i') (y'.seq i') A B (e' + 4 * Q.invS n) (e + 4 * Q.invS n)
+        (R.abs_le_bnd x i) (R.abs_le_bnd y' i')
+        (R.dist_close hy i i' n (R.mulIdx_ge x y n) (R.mulIdx_ge x' y' n))
+        (R.dist_close hx i i' n (R.mulIdx_ge x y n) (R.mulIdx_ge x' y' n)))
+      (Q.trans (q_ring! A * (e' + 4 * Q.invS n) + B * (e + 4 * Q.invS n) ≈ A * e' + B * e + 4 * (A + B) * Q.invS n)
+        (Q.add_congr (Q.refl _) (Q.mul_congr (Q.symm (Q.ofNat_4ab (R.bnd x) (R.bnd y'))) (Q.refl (Q.invS n))))))
