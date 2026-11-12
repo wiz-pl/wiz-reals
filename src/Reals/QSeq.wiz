@@ -1,4 +1,4 @@
-import Reals.QLaws
+import Rat
 -- The rationals `1/(n+1)` and what regular sequences need of them.
 
 def Q.invS (n : Nat) : Q := Q.mk 1 (Int.ofNat (Nat.succ n)) (Int.ofNat_succ_pos n)
@@ -14,7 +14,7 @@ def Int.ofNat_le (m n : Nat) (h : Nat.Le m n) : Int.Le (Int.ofNat m) (Int.ofNat 
 def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
   Int.Le.congr (int_ring! Int.ofNat (Nat.succ m) = 1 * Int.ofNat (Nat.succ m)) (int_ring! Int.ofNat (Nat.succ n) = 1 * Int.ofNat (Nat.succ n))
     (Int.ofNat_le (Nat.succ m) (Nat.succ n) h)
-def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.le_zero n)
+def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.zero_le n)
 
 -- `(k + 1) · 1/(n+1)` in terms of the integers
 def Q.invS_den (n : Nat) : (Q.invS n).den = Int.ofNat n + 1 := Int.ofNat_succ n
