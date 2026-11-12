@@ -1,4 +1,4 @@
-import Reals.IntRing
+import Reals.ZRing
 -- The order of the integers: `a ≤ b` when `b - a` is not negative.
 
 def Int.NonNeg (a : Int) : Prop := Int.isNeg a = .false

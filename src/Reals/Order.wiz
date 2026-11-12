@@ -1,0 +1,12 @@
+import Logic
+-- Notation for orders and equivalences, as classes (one instance per number type).
+
+class LE (A : Type) where
+  le : A → A → Prop
+class LT (A : Type) where
+  lt : A → A → Prop
+class Equiv (A : Type) where
+  equiv : A → A → Prop
+infix:50 " ≤ " => LE.le
+infix:50 " < " => LT.lt
+infix:50 " ≈ " => Equiv.equiv

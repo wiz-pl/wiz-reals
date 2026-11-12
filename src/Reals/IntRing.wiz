@@ -4,7 +4,7 @@ import Reals.Int
 -- `IE.toPair e` is a pair of `NE`s whose difference is `e` (each atom `aᵢ` becomes the
 -- difference of the atoms `2i` and `2i+1`, its positive and negative parts). Two
 -- expressions are equal when `p₁ + q₂` and `q₁ + p₂` have the same normal form.
--- `int_ring! lhs = rhs` builds the expressions from the syntax, as `nat_ring!` does.
+-- `int_pair_ring! lhs = rhs` builds the expressions from the syntax, as `nat_ring!` does.
 
 inductive IE where
   | atom (i : Nat)
@@ -66,13 +66,15 @@ def IE.sound (ρ : List Int) : (e : IE) →
   | .sub a b =>
     Eq.trans (congrArg2 (fun x y => x - y) (IE.sound ρ a) (IE.sound ρ b)) (Int.ofPair_sub _ _ _ _)
 
-def IE.prove (ρ : List Int) (a b : IE)
-    (h : NE.norm (.add (IE.toPair a).1 (IE.toPair b).2) = NE.norm (.add (IE.toPair b).1 (IE.toPair a).2)) :
+def IE.provePairs (ρ : List Int) (a b : IE)
+    (h : Poly.beq (NE.norm (.add (IE.toPair a).1 (IE.toPair b).2)) (NE.norm (.add (IE.toPair b).1 (IE.toPair a).2)) = .true) :
     IE.eval ρ a = IE.eval ρ b :=
   Eq.trans (IE.sound ρ a)
     (Eq.trans (Int.ofPair_eq _ _ _ _ (NE.prove (IE.env ρ) (.add (IE.toPair a).1 (IE.toPair b).2) (.add (IE.toPair b).1 (IE.toPair a).2) h))
       (Eq.symm (IE.sound ρ b)))
 
-def IntRing.expand : Macro := fun stx => Reify.expand .true stx
-syntax:lead (name := intRing) "int_ring!" term : term
-attribute [macro term.intRing] IntRing.expand
+-- (`int_pair_ring!` is the bootstrap: it proves the lemmas of Reals.ZRing, whose
+-- `int_ring!` normalises with integer coefficients and is much faster)
+def IntPairRing.expand : Macro := fun stx => Reify.expandWith "IE" "provePairs" stx
+syntax:lead (name := intPairRing) "int_pair_ring!" term : term
+attribute [macro term.intPairRing] IntPairRing.expand

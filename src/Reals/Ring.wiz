@@ -204,12 +204,52 @@ def NE.eval_norm (ρ : List Nat) : (e : NE) → Poly.eval ρ (NE.norm e) = NE.ev
   | .add a b => Eq.trans (Poly.eval_add ρ (NE.norm a) (NE.norm b)) (congrArg2 (fun y z => y + z) (NE.eval_norm ρ a) (NE.eval_norm ρ b))
   | .mul a b => Eq.trans (Poly.eval_mul ρ (NE.norm a) (NE.norm b)) (congrArg2 (fun y z => y * z) (NE.eval_norm ρ a) (NE.eval_norm ρ b))
 
-def NE.prove (ρ : List Nat) (a b : NE) (h : NE.norm a = NE.norm b) : NE.eval ρ a = NE.eval ρ b :=
-  Eq.trans (Eq.symm (NE.eval_norm ρ a)) (Eq.trans (congrArg (Poly.eval ρ) h) (NE.eval_norm ρ b))
+-- The normal forms are compared by a Boolean function, not by `rfl` at `Poly`: the
+-- kernel computes an equation of two closed lists into a Σ of the elements' equations
+-- under casts, which costs far more than the comparison (FINDINGS.md, S2).
+def Key.beq : List Nat → List Nat → Bool
+  | .nil, .nil => .true
+  | .cons x xs, .cons y ys => Bool.and (Nat.beq x y) (Key.beq xs ys)
+  | _, _ => .false
+def Bool.and_left : (a b : Bool) → Bool.and a b = .true → a = .true
+  | .true, _, _ => rfl
+  | .false, _, h => absurd h.1
+def Bool.and_right : (a b : Bool) → Bool.and a b = .true → b = .true
+  | .true, _, h => h
+  | .false, _, h => absurd h.1
+def Nat.beq_eq : (m n : Nat) → Nat.beq m n = .true → m = n
+  | .zero, .zero, _ => rfl
+  | .zero, .succ _, h => absurd h.1
+  | .succ _, .zero, h => absurd h.1
+  | .succ m, .succ n, h => congrArg Nat.succ (Nat.beq_eq m n h)
+def Key.beq_eq : (xs ys : List Nat) → Key.beq xs ys = .true → xs = ys
+  | .nil, .nil, _ => rfl
+  | .nil, .cons _ _, h => absurd h.1
+  | .cons _ _, .nil, h => absurd h.1
+  | .cons x xs, .cons y ys, h =>
+    congrArg2 List.cons (Nat.beq_eq x y (Bool.and_left _ _ h)) (Key.beq_eq xs ys (Bool.and_right _ _ h))
+def Poly.beq : Poly → Poly → Bool
+  | .nil, .nil => .true
+  | .cons m p, .cons n q => Bool.and (Bool.and (Nat.beq m.1 n.1) (Key.beq m.2 n.2)) (Poly.beq p q)
+  | _, _ => .false
+-- (only what the evaluation sees: the value of `p`, not `p` itself)
+def Poly.beq_eval (ρ : List Nat) : (p q : Poly) → Poly.beq p q = .true → Poly.eval ρ p = Poly.eval ρ q
+  | .nil, .nil, _ => rfl
+  | .nil, .cons _ _, h => absurd h.1
+  | .cons _ _, .nil, h => absurd h.1
+  | .cons m p, .cons n q, h =>
+    let h1 := Bool.and_left _ _ h;
+    congrArg2 (fun x y => x + y)
+      (congrArg2 (fun c xs => c * Key.prod ρ xs) (Nat.beq_eq m.1 n.1 (Bool.and_left _ _ h1)) (Key.beq_eq m.2 n.2 (Bool.and_right _ _ h1)))
+      (Poly.beq_eval ρ p q (Bool.and_right _ _ h))
+
+def NE.prove (ρ : List Nat) (a b : NE) (h : Poly.beq (NE.norm a) (NE.norm b) = .true) : NE.eval ρ a = NE.eval ρ b :=
+  Eq.trans (Eq.symm (NE.eval_norm ρ a)) (Eq.trans (Poly.beq_eval ρ (NE.norm a) (NE.norm b) h) (NE.eval_norm ρ b))
 
 -- ## The macro: `nat_ring! lhs = rhs`
 --
--- Reification is syntactic: `+`, `*`, parentheses, numerals and `Nat.succ` are understood, every
+-- Reification is syntactic: `+`, `*`, parentheses, ascriptions `(e : T)`, numerals and `Nat.succ`
+-- are understood, every
 -- other subterm is an atom (two atoms are the same when their syntax is).
 
 partial def Syn.beq : {ω b c : Bool} → SyntaxF b → SyntaxF c → Bool
@@ -228,15 +268,17 @@ def Reify.find (x : Syntax) : List Syntax → Nat
 def Reify.snoc (x : Syntax) : List Syntax → List Syntax
   | .nil => .cons x .nil
   | .cons y ys => .cons y (Reify.snoc x ys)
--- The reifier serves `nat_ring!` (`int = false`: constructors `NE.*`, and `Nat.succ`)
--- and `int_ring!` (`int = true`: constructors `IE.*`, and `-`, both binary and unary).
-def Reify.ctor (int : Bool) (c : String) : Syntax :=
-  Syntax.mkVar (String.append (if int then "IE." else "NE.") c)
-def Reify.atom (int : Bool) (x : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+-- The reifier serves `nat_ring!` (`pre = "NE"`: and `Nat.succ`), `int_ring!` (`"IE"`)
+-- and `q_ring!` (`"QE"`): the constructors of the expression type `pre`. The last two
+-- also have `-`, binary and unary.
+def Reify.ctor (pre : String) (c : String) : Syntax :=
+  Syntax.mkVar (String.append pre (String.append "." c))
+def Reify.signed (pre : String) : Bool := Bool.not (Expr.nameEq pre "NE")
+def Reify.atom (pre : String) (x : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
   let i := Reify.find x atoms;
   let atoms' := if Nat.beq i (List.length atoms) then Reify.snoc x atoms else atoms;
   let n := Syntax.mkNode "term.num" (.cons (Syntax.mkNode "num" (.cons (.atom (Syntax.decimal i)) .nil)) .nil);
-  (Syntax.mkApp (Reify.ctor int "atom") (.cons n .nil), atoms')
+  (Syntax.mkApp (Reify.ctor pre "atom") (.cons n .nil), atoms')
 
 -- `Nat.succ t` (as `1 + t`, which computes to it)
 def Reify.isSucc (stx : Syntax) : Bool := match Syntax.getArg (Syntax.getArg stx 0) 0 with
@@ -247,45 +289,49 @@ def Reify.isSucc (stx : Syntax) : Bool := match Syntax.getArg (Syntax.getArg stx
 def Reify.succArg (stx : Syntax) : Syntax := Syntax.getArg (Syntax.getArg stx 1) 0
 
 mutual
-def Reify.go (int : Bool) (stx : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+def Reify.go (pre : String) (stx : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
   match stx with
   | .node k args =>
-    if Expr.nameEq k "term.+" then Reify.bin int "add" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
-    else if Expr.nameEq k "term.*" then Reify.bin int "mul" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
-    else if Expr.nameEq k "term.paren" then Reify.go int (SyntaxF.nth args 1) atoms
-    else if Expr.nameEq k "term.num" then (Syntax.mkApp (Reify.ctor int "lit") (.cons stx .nil), atoms)
-    else if Bool.and int (Expr.nameEq k "term.-") then Reify.bin int "sub" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
-    else if Bool.and int (Expr.nameEq k "term.neg") then
-      let r := Reify.go int (SyntaxF.nth args 1) atoms;
-      (Syntax.mkApp (Reify.ctor int "neg") (.cons r.1 .nil), r.2)
-    else if Bool.and (Bool.not int) (Reify.isSucc stx) then Reify.bin int "add" `(term| 1) (Reify.succArg stx) atoms
-    else Reify.atom int stx atoms
-  | _ => Reify.atom int stx atoms
-def Reify.bin (int : Bool) (f : String) (a b : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
-  let ra := Reify.go int a atoms;
-  let rb := Reify.go int b ra.2;
-  (Syntax.mkApp (Reify.ctor int f) (.cons ra.1 (.cons rb.1 .nil)), rb.2)
+    if Expr.nameEq k "term.+" then Reify.bin pre "add" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.*" then Reify.bin pre "mul" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.paren" then Reify.go pre (SyntaxF.nth args 1) atoms
+    else if Expr.nameEq k "term.ascription" then Reify.go pre (SyntaxF.nth args 1) atoms
+    else if Expr.nameEq k "term.num" then (Syntax.mkApp (Reify.ctor pre "lit") (.cons stx .nil), atoms)
+    else if Bool.and (Reify.signed pre) (Expr.nameEq k "term.-") then Reify.bin pre "sub" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Bool.and (Reify.signed pre) (Expr.nameEq k "term.neg") then
+      let r := Reify.go pre (SyntaxF.nth args 1) atoms;
+      (Syntax.mkApp (Reify.ctor pre "neg") (.cons r.1 .nil), r.2)
+    else if Bool.and (Bool.not (Reify.signed pre)) (Reify.isSucc stx) then Reify.bin pre "add" `(term| 1) (Reify.succArg stx) atoms
+    else Reify.atom pre stx atoms
+  | _ => Reify.atom pre stx atoms
+def Reify.bin (pre : String) (f : String) (a b : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+  let ra := Reify.go pre a atoms;
+  let rb := Reify.go pre b ra.2;
+  (Syntax.mkApp (Reify.ctor pre f) (.cons ra.1 (.cons rb.1 .nil)), rb.2)
 end
 
 def Reify.list : List Syntax → Syntax
   | .nil => `(term| List.nil)
   | .cons x xs => let r := Reify.list xs; `(term| List.cons $x $r)
 
--- `(P.prove ρ e₁ e₂ rfl : lhs = rhs)`
-def Reify.expand (int : Bool) (stx : Syntax) : MacroM Syntax :=
+-- `P.prove ρ e₁ e₂ rfl`, a proof of `lhs = rhs` when that is the expected type
+def Reify.expandWith (pre : String) (prove : String) (stx : Syntax) : MacroM Syntax :=
   let eqn := Syntax.getArg stx 1;
   match eqn with
   | .node k args =>
-    if Expr.nameEq k "term.eq" then
-      let l := Reify.go int (SyntaxF.nth args 0) .nil;
-      let r := Reify.go int (SyntaxF.nth args 2) l.2;
+    if Bool.or (Expr.nameEq k "term.eq") (Expr.nameEq k "term.≈") then
+      let l := Reify.go pre (SyntaxF.nth args 0) .nil;
+      let r := Reify.go pre (SyntaxF.nth args 2) l.2;
       let ρ := Reify.list r.2;
       let el := l.1;
       let er := r.1;
-      let pr := Syntax.mkApp (Reify.ctor int "prove") (.cons ρ (.cons el (.cons er (.cons `(term| rfl) .nil))));
-      MacroM.pure `(term| ($pr : $eqn))
+      let pr := Syntax.mkApp (Reify.ctor pre prove) (.cons ρ (.cons el (.cons er (.cons `(term| rfl) .nil))));
+      -- no ascription `($pr : $eqn)`: the proof is checked against the expected type,
+      -- which is much faster (FINDINGS.md, S3), so the equation must be the expected type
+      MacroM.pure pr
     else MacroM.throw "ring!: expected an equation `lhs = rhs`"
   | _ => MacroM.throw "ring!: expected an equation `lhs = rhs`"
-def NatRing.expand : Macro := fun stx => Reify.expand .false stx
+def Reify.expand (pre : String) (stx : Syntax) : MacroM Syntax := Reify.expandWith pre "prove" stx
+def NatRing.expand : Macro := fun stx => Reify.expand "NE" stx
 syntax:lead (name := natRing) "nat_ring!" term : term
 attribute [macro term.natRing] NatRing.expand

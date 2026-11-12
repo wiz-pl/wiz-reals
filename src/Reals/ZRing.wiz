@@ -1,0 +1,157 @@
+import Reals.IntRing
+-- `int_ring! lhs = rhs`: equations of commutative rings at `Int`, normalised with
+-- integer coefficients (monomials whose coefficients cancel are dropped). The lemmas it
+-- needs about `Int` are proved by the slower `int_pair_ring!` (Reals.IntRing).
+
+def Int.beq_eq : (a b : Int) → Int.beq a b = .true → a = b
+  | .ofNat m, .ofNat n, h => congrArg Int.ofNat (Nat.beq_eq m n h)
+  | .negSucc m, .negSucc n, h => congrArg Int.negSucc (Nat.beq_eq m n h)
+  | .ofNat _, .negSucc _, h => absurd h.1
+  | .negSucc _, .ofNat _, h => absurd h.1
+
+def ZKey.prod (ρ : List Int) : List Nat → Int
+  | .nil => 1
+  | .cons i xs => IE.get ρ i * ZKey.prod ρ xs
+
+def ZPoly : Type := List (Int × List Nat)
+
+def ZPoly.eval (ρ : List Int) : ZPoly → Int
+  | .nil => 0
+  | .cons m p => m.1 * ZKey.prod ρ m.2 + ZPoly.eval ρ p
+
+-- equal keys: the coefficients add up, and the monomial goes if they cancel
+def ZPoly.addEq : Bool → Int → List Nat → ZPoly → ZPoly
+  | .true, _, _, p => p
+  | .false, c, xs, p => .cons (c, xs) p
+def ZPoly.addMonoO : Ord3 → Int → List Nat → Int → List Nat → ZPoly → ZPoly → ZPoly
+  | .lt, c, xs, d, ys, p, _ => .cons (c, xs) (.cons (d, ys) p)
+  | .eq, c, xs, d, _, p, _ => ZPoly.addEq (Int.beq (c + d) 0) (c + d) xs p
+  | .gt, _, _, d, ys, _, rec => .cons (d, ys) rec
+def ZPoly.addMono (c : Int) (xs : List Nat) : ZPoly → ZPoly
+  | .nil => .cons (c, xs) .nil
+  | .cons m p => ZPoly.addMonoO (Key.cmp xs m.2) c xs m.1 m.2 p (ZPoly.addMono c xs p)
+def ZPoly.add : ZPoly → ZPoly → ZPoly
+  | .nil, q => q
+  | .cons m p, q => ZPoly.addMono m.1 m.2 (ZPoly.add p q)
+def ZPoly.mulMono (c : Int) (xs : List Nat) : ZPoly → ZPoly
+  | .nil => .nil
+  | .cons m q => ZPoly.addMono (c * m.1) (Key.merge xs m.2) (ZPoly.mulMono c xs q)
+def ZPoly.mul : ZPoly → ZPoly → ZPoly
+  | .nil, _ => .nil
+  | .cons m p, q => ZPoly.add (ZPoly.mulMono m.1 m.2 q) (ZPoly.mul p q)
+def ZPoly.const : Nat → ZPoly
+  | .zero => .nil
+  | .succ n => .cons (Int.ofNat (.succ n), .nil) .nil
+
+def IE.norm : IE → ZPoly
+  | .atom i => .cons (1, .cons i .nil) .nil
+  | .lit n => ZPoly.const n
+  | .add a b => ZPoly.add (IE.norm a) (IE.norm b)
+  | .mul a b => ZPoly.mul (IE.norm a) (IE.norm b)
+  | .neg a => ZPoly.mulMono (-1) .nil (IE.norm a)
+  | .sub a b => ZPoly.add (IE.norm a) (ZPoly.mulMono (-1) .nil (IE.norm b))
+
+-- ## Soundness
+
+def ZKey.prod_insertB (ρ : List Int) (x y : Nat) (ys rec : List Nat)
+    (ih : ZKey.prod ρ rec = IE.get ρ x * ZKey.prod ρ ys) :
+    (b : Bool) → ZKey.prod ρ (Key.insertB b x y ys rec) = IE.get ρ x * (IE.get ρ y * ZKey.prod ρ ys)
+  | .true => rfl
+  | .false => Eq.trans (congrArg (fun z => IE.get ρ y * z) ih)
+                (int_pair_ring! IE.get ρ y * (IE.get ρ x * ZKey.prod ρ ys) = IE.get ρ x * (IE.get ρ y * ZKey.prod ρ ys))
+def ZKey.prod_insert (ρ : List Int) (x : Nat) : (ys : List Nat) →
+    ZKey.prod ρ (Key.insert x ys) = IE.get ρ x * ZKey.prod ρ ys
+  | .nil => rfl
+  | .cons y ys => ZKey.prod_insertB ρ x y ys (Key.insert x ys) (ZKey.prod_insert ρ x ys) (Nat.le x y)
+def ZKey.prod_merge (ρ : List Int) : (xs ys : List Nat) →
+    ZKey.prod ρ (Key.merge xs ys) = ZKey.prod ρ xs * ZKey.prod ρ ys
+  | .nil, ys => int_pair_ring! ZKey.prod ρ ys = 1 * ZKey.prod ρ ys
+  | .cons x xs, ys =>
+    Eq.trans (ZKey.prod_insert ρ x (Key.merge xs ys))
+      (Eq.trans (congrArg (fun z => IE.get ρ x * z) (ZKey.prod_merge ρ xs ys))
+        (int_pair_ring! IE.get ρ x * (ZKey.prod ρ xs * ZKey.prod ρ ys) = IE.get ρ x * ZKey.prod ρ xs * ZKey.prod ρ ys))
+
+def ZPoly.eval_addEq (ρ : List Int) (s : Int) (xs : List Nat) (p : ZPoly) :
+    (b : Bool) → Int.beq s 0 = b → ZPoly.eval ρ (ZPoly.addEq b s xs p) = s * ZKey.prod ρ xs + ZPoly.eval ρ p
+  | .true, h =>
+    Eq.trans (int_pair_ring! ZPoly.eval ρ p = 0 * ZKey.prod ρ xs + ZPoly.eval ρ p)
+      (congrArg (fun z => z * ZKey.prod ρ xs + ZPoly.eval ρ p) (Eq.symm (Int.beq_eq s 0 h)))
+  | .false, _ => rfl
+def ZPoly.eval_addMonoO (ρ : List Int) (c : Int) (xs : List Nat) (d : Int) (ys : List Nat) (p rec : ZPoly)
+    (ih : ZPoly.eval ρ rec = c * ZKey.prod ρ xs + ZPoly.eval ρ p) :
+    (o : Ord3) → Key.cmp xs ys = o →
+    ZPoly.eval ρ (ZPoly.addMonoO o c xs d ys p rec) = c * ZKey.prod ρ xs + (d * ZKey.prod ρ ys + ZPoly.eval ρ p)
+  | .lt, _ => rfl
+  | .eq, h =>
+    let e := Key.cmp_eq xs ys h;
+    Eq.trans (ZPoly.eval_addEq ρ (c + d) xs p (Int.beq (c + d) 0) rfl)
+      (Eq.trans (int_pair_ring! (c + d) * ZKey.prod ρ xs + ZPoly.eval ρ p = c * ZKey.prod ρ xs + (d * ZKey.prod ρ xs + ZPoly.eval ρ p))
+        (congrArg (fun (zs : List Nat) => c * ZKey.prod ρ xs + (d * ZKey.prod ρ zs + ZPoly.eval ρ p)) e))
+  | .gt, _ =>
+    Eq.trans (congrArg (fun z => d * ZKey.prod ρ ys + z) ih)
+      (int_pair_ring! d * ZKey.prod ρ ys + (c * ZKey.prod ρ xs + ZPoly.eval ρ p) = c * ZKey.prod ρ xs + (d * ZKey.prod ρ ys + ZPoly.eval ρ p))
+def ZPoly.eval_addMono (ρ : List Int) (c : Int) (xs : List Nat) : (p : ZPoly) →
+    ZPoly.eval ρ (ZPoly.addMono c xs p) = c * ZKey.prod ρ xs + ZPoly.eval ρ p
+  | .nil => rfl
+  | .cons m p =>
+    ZPoly.eval_addMonoO ρ c xs m.1 m.2 p (ZPoly.addMono c xs p) (ZPoly.eval_addMono ρ c xs p) (Key.cmp xs m.2) rfl
+def ZPoly.eval_add (ρ : List Int) : (p q : ZPoly) → ZPoly.eval ρ (ZPoly.add p q) = ZPoly.eval ρ p + ZPoly.eval ρ q
+  | .nil, q => int_pair_ring! ZPoly.eval ρ q = 0 + ZPoly.eval ρ q
+  | .cons m p, q =>
+    Eq.trans (ZPoly.eval_addMono ρ m.1 m.2 (ZPoly.add p q))
+      (Eq.trans (congrArg (fun z => m.1 * ZKey.prod ρ m.2 + z) (ZPoly.eval_add ρ p q))
+        (int_pair_ring! m.1 * ZKey.prod ρ m.2 + (ZPoly.eval ρ p + ZPoly.eval ρ q) = m.1 * ZKey.prod ρ m.2 + ZPoly.eval ρ p + ZPoly.eval ρ q))
+def ZPoly.eval_mulMono (ρ : List Int) (c : Int) (xs : List Nat) : (q : ZPoly) →
+    ZPoly.eval ρ (ZPoly.mulMono c xs q) = c * ZKey.prod ρ xs * ZPoly.eval ρ q
+  | .nil => Eq.symm (int_pair_ring! c * ZKey.prod ρ xs * 0 = 0)
+  | .cons m q =>
+    Eq.trans (ZPoly.eval_addMono ρ (c * m.1) (Key.merge xs m.2) (ZPoly.mulMono c xs q))
+      (Eq.trans
+        (congrArg2 (fun y z => c * m.1 * y + z) (ZKey.prod_merge ρ xs m.2) (ZPoly.eval_mulMono ρ c xs q))
+        (int_pair_ring! c * m.1 * (ZKey.prod ρ xs * ZKey.prod ρ m.2) + c * ZKey.prod ρ xs * ZPoly.eval ρ q
+           = c * ZKey.prod ρ xs * (m.1 * ZKey.prod ρ m.2 + ZPoly.eval ρ q)))
+def ZPoly.eval_mul (ρ : List Int) : (p q : ZPoly) → ZPoly.eval ρ (ZPoly.mul p q) = ZPoly.eval ρ p * ZPoly.eval ρ q
+  | .nil, q => Eq.symm (int_pair_ring! 0 * ZPoly.eval ρ q = 0)
+  | .cons m p, q =>
+    Eq.trans (ZPoly.eval_add ρ (ZPoly.mulMono m.1 m.2 q) (ZPoly.mul p q))
+      (Eq.trans (congrArg2 (fun y z => y + z) (ZPoly.eval_mulMono ρ m.1 m.2 q) (ZPoly.eval_mul ρ p q))
+        (int_pair_ring! m.1 * ZKey.prod ρ m.2 * ZPoly.eval ρ q + ZPoly.eval ρ p * ZPoly.eval ρ q
+           = (m.1 * ZKey.prod ρ m.2 + ZPoly.eval ρ p) * ZPoly.eval ρ q))
+def ZPoly.eval_const (ρ : List Int) : (n : Nat) → ZPoly.eval ρ (ZPoly.const n) = Int.ofNat n
+  | .zero => rfl
+  | .succ n => int_pair_ring! Int.ofNat (Nat.succ n) * 1 + 0 = Int.ofNat (Nat.succ n)
+def ZPoly.eval_neg (ρ : List Int) (p : ZPoly) : ZPoly.eval ρ (ZPoly.mulMono (-1) .nil p) = -(ZPoly.eval ρ p) :=
+  Eq.trans (ZPoly.eval_mulMono ρ (-1) .nil p) (int_pair_ring! (-1 : Int) * 1 * ZPoly.eval ρ p = -(ZPoly.eval ρ p))
+
+def IE.eval_norm (ρ : List Int) : (e : IE) → ZPoly.eval ρ (IE.norm e) = IE.eval ρ e
+  | .atom i => int_pair_ring! 1 * (IE.get ρ i * 1) + 0 = IE.get ρ i
+  | .lit n => ZPoly.eval_const ρ n
+  | .add a b => Eq.trans (ZPoly.eval_add ρ (IE.norm a) (IE.norm b)) (congrArg2 (fun y z => y + z) (IE.eval_norm ρ a) (IE.eval_norm ρ b))
+  | .mul a b => Eq.trans (ZPoly.eval_mul ρ (IE.norm a) (IE.norm b)) (congrArg2 (fun y z => y * z) (IE.eval_norm ρ a) (IE.eval_norm ρ b))
+  | .neg a => Eq.trans (ZPoly.eval_neg ρ (IE.norm a)) (congrArg (fun y => -y) (IE.eval_norm ρ a))
+  | .sub a b =>
+    Eq.trans (ZPoly.eval_add ρ (IE.norm a) (ZPoly.mulMono (-1) .nil (IE.norm b)))
+      (Eq.trans (congrArg2 (fun y z => y + z) (IE.eval_norm ρ a) (Eq.trans (ZPoly.eval_neg ρ (IE.norm b)) (congrArg (fun y => -y) (IE.eval_norm ρ b))))
+        (int_pair_ring! IE.eval ρ a + -(IE.eval ρ b) = IE.eval ρ a - IE.eval ρ b))
+
+def ZPoly.beq : ZPoly → ZPoly → Bool
+  | .nil, .nil => .true
+  | .cons m p, .cons n q => Bool.and (Bool.and (Int.beq m.1 n.1) (Key.beq m.2 n.2)) (ZPoly.beq p q)
+  | _, _ => .false
+def ZPoly.beq_eval (ρ : List Int) : (p q : ZPoly) → ZPoly.beq p q = .true → ZPoly.eval ρ p = ZPoly.eval ρ q
+  | .nil, .nil, _ => rfl
+  | .nil, .cons _ _, h => absurd h.1
+  | .cons _ _, .nil, h => absurd h.1
+  | .cons m p, .cons n q, h =>
+    let h1 := Bool.and_left _ _ h;
+    congrArg2 (fun x y => x + y)
+      (congrArg2 (fun c xs => c * ZKey.prod ρ xs) (Int.beq_eq m.1 n.1 (Bool.and_left _ _ h1)) (Key.beq_eq m.2 n.2 (Bool.and_right _ _ h1)))
+      (ZPoly.beq_eval ρ p q (Bool.and_right _ _ h))
+
+-- (a Boolean comparison of the normal forms: see `NE.prove`)
+def IE.prove (ρ : List Int) (a b : IE) (h : ZPoly.beq (IE.norm a) (IE.norm b) = .true) : IE.eval ρ a = IE.eval ρ b :=
+  Eq.trans (Eq.symm (IE.eval_norm ρ a)) (Eq.trans (ZPoly.beq_eval ρ (IE.norm a) (IE.norm b) h) (IE.eval_norm ρ b))
+
+def IntRing.expand : Macro := fun stx => Reify.expand "IE" stx
+syntax:lead (name := intRing) "int_ring!" term : term
+attribute [macro term.intRing] IntRing.expand

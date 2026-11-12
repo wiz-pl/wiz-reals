@@ -1,0 +1,34 @@
+import Reals.IntOrder
+import Reals.Order
+-- Rationals: a numerator and a positive denominator, not reduced. Two rationals are
+-- equal when `a/b ≈ c/d`, i.e. `a·d = c·b`: a setoid, not a quotient (Wiz has no
+-- quotient types; DESIGN.md).
+
+instance : LE Int := LE.mk Int.Le
+instance : LT Int := LT.mk Int.Lt
+
+structure Q where
+  num : Int
+  den : Int
+  pos : Int.Lt 0 den
+
+def Q.Eq (p q : Q) : Prop := p.num * q.den = q.num * p.den
+def Q.Le (p q : Q) : Prop := Int.Le (p.num * q.den) (q.num * p.den)
+def Q.Lt (p q : Q) : Prop := Int.Lt (p.num * q.den) (q.num * p.den)
+instance : Equiv Q := Equiv.mk Q.Eq
+instance : LE Q := LE.mk Q.Le
+instance : LT Q := LT.mk Q.Lt
+
+def Q.ofInt (a : Int) : Q := Q.mk a 1 rfl
+instance {ω n : Nat} : OfNat Q n := OfNat.mk (Q.ofInt (Int.ofNat n))
+
+def Q.add (p q : Q) : Q :=
+  Q.mk (p.num * q.den + q.num * p.den) (p.den * q.den) (Int.mul_pos p.den q.den p.pos q.pos)
+def Q.neg (p : Q) : Q := Q.mk (-p.num) p.den p.pos
+def Q.sub (p q : Q) : Q := Q.add p (Q.neg q)
+def Q.mul (p q : Q) : Q := Q.mk (p.num * q.num) (p.den * q.den) (Int.mul_pos p.den q.den p.pos q.pos)
+instance : Add Q := Add.mk Q.add
+instance : Neg Q := Neg.mk Q.neg
+instance : Sub Q := Sub.mk Q.sub
+instance : Mul Q := Mul.mk Q.mul
+
