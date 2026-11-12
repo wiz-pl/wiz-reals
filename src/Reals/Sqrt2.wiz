@@ -1,0 +1,55 @@
+import Reals.Complete
+import Reals.Isqrt
+-- √2: digits with a bound on the error of their square, and √2 as a real number.
+
+-- ## Facts about naturals
+
+def Nat.lt_of_mul_self_lt (p q : Nat) (h : Nat.Lt (p * p) (q * q)) : Nat.Lt p q :=
+  Or.elim (Bool.cases (Nat.le q p))
+    (fun (hle : Nat.le q p = .true) =>
+      absurd (Nat.lt_irrefl (p * p) (Nat.lt_of_lt_of_le (p * p) (q * q) (p * p) h (Nat.mul_le_mul q p q p hle hle))))
+    (fun (hf : Nat.le q p = .false) => Nat.not_le q p hf)
+
+-- ## The approximation `d/P` with `d = isqrt (2P²)`
+
+def Sqrt2.d (P : Nat) : Nat := Nat.isqrt (2 * (P * P))
+def Sqrt2.lo (P : Nat) : Nat.Le (Sqrt2.d P * Sqrt2.d P) (2 * (P * P)) := (Nat.isqrt_spec (2 * (P * P))).1
+def Sqrt2.hi (P : Nat) : Nat.Lt (2 * (P * P)) (Nat.succ (Sqrt2.d P) * Nat.succ (Sqrt2.d P)) := (Nat.isqrt_spec (2 * (P * P))).2
+-- `2P² ≤ d² + 2d`
+def Sqrt2.gap (P : Nat) : Nat.Le (2 * (P * P)) (Sqrt2.d P * Sqrt2.d P + 2 * Sqrt2.d P) :=
+  Eq.mp' (fun (z : Nat) => Nat.Le (2 * (P * P)) z)
+    (nat_ring! Sqrt2.d P + Sqrt2.d P * Nat.succ (Sqrt2.d P) = Sqrt2.d P * Sqrt2.d P + 2 * Sqrt2.d P) (Sqrt2.hi P)
+-- `d < 2P` (for `P ≥ 1`)
+def Sqrt2.d_lt (p : Nat) : Nat.Lt (Sqrt2.d (Nat.succ p)) (2 * Nat.succ p) :=
+  let P := Nat.succ p;
+  Nat.lt_of_mul_self_lt (Sqrt2.d P) (2 * P)
+    (Nat.lt_of_le_of_lt (Sqrt2.d P * Sqrt2.d P) (2 * (P * P)) (2 * P * (2 * P)) (Sqrt2.lo P)
+      (Eq.mp' (fun (z : Nat) => Nat.Lt (2 * (P * P)) z) (nat_ring! Nat.succ (2 * (Nat.succ p * Nat.succ p)) + (2 * (p * Nat.succ p) + 2 * p + 1) = 2 * Nat.succ p * (2 * Nat.succ p))
+        (Nat.le_add_right (Nat.succ (2 * (P * P))) (2 * (p * P) + 2 * p + 1))))
+
+def Sqrt2.approx (p : Nat) : Q :=
+  Q.mk (Int.ofNat (Sqrt2.d (Nat.succ p))) (Int.ofNat (Nat.succ p)) (Int.ofNat_succ_pos p)
+-- the error bound `4/P`
+def Sqrt2.err (p : Nat) : Q := Q.mk 4 (Int.ofNat (Nat.succ p)) (Int.ofNat_succ_pos p)
+
+-- **The digits square to 2 within the error**: `|(d/P)² - 2| ≤ 4/P`, `P = p + 1`.
+def Sqrt2.approx_sq (p : Nat) : Q.abs (Sqrt2.approx p * Sqrt2.approx p - 2) ≤ Sqrt2.err p :=
+  let P := Nat.succ p;
+  let d := Sqrt2.d P;
+  let D := Int.ofNat d;
+  let PP := Int.ofNat P;
+  let hA : Int.Le (D * D) (2 * (PP * PP)) := Int.ofNat_le (d * d) (2 * (P * P)) (Sqrt2.lo P);
+  let hB : Int.Le (2 * (PP * PP)) (D * D + 2 * D) := Int.ofNat_le (2 * (P * P)) (d * d + 2 * d) (Sqrt2.gap P);
+  let hC : Int.Lt D (2 * PP) :=
+    @Int.Le.congr (Int.ofNat (Nat.succ d)) (Int.ofNat (2 * P)) (D + 1) (2 * PP)
+      (Int.ofNat_succ d) (refl (Int.ofNat (2 * P))) (Int.ofNat_le (Nat.succ d) (2 * P) (Sqrt2.d_lt p));
+  let hPP : Int.NonNeg PP := Int.nonneg_ofNat P;
+  let up : Sqrt2.approx p * Sqrt2.approx p - 2 ≤ Sqrt2.err p :=
+    Int.NonNeg.congr (int_ring! 4 * (PP * PP) + (2 * (PP * PP) - D * D) * PP = 4 * (PP * PP * 1) - (D * D * 1 + -2 * (PP * PP)) * PP)
+      (Int.nonneg_add _ _ (Int.nonneg_mul 4 (PP * PP) rfl (Int.nonneg_mul PP PP hPP hPP)) (Int.nonneg_mul _ PP hA hPP));
+  let lo : -(Sqrt2.err p) ≤ Sqrt2.approx p * Sqrt2.approx p - 2 :=
+    Int.NonNeg.congr (int_ring! (2 * (2 * PP - (D + 1)) + (D * D + 2 * D - 2 * (PP * PP)) + 2) * PP
+        = (D * D * 1 + -2 * (PP * PP)) * PP - -4 * (PP * PP * 1))
+      (Int.nonneg_mul _ PP
+        (Int.nonneg_add _ 2 (Int.nonneg_add _ _ (Int.nonneg_mul 2 _ rfl hC) hB) rfl) hPP);
+  Q.abs_le_of_bounds lo up
