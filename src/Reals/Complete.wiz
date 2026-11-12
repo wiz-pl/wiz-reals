@@ -1,0 +1,70 @@
+import Reals.RealMul
+-- Distances, the completeness of the reals, and the continuity of `+` and `·`.
+--
+-- `R.Dist x y e`: the distance between `x` and `y` is at most `e` (a rational), i.e.
+-- `|xₖ - yₖ| ≤ e + 2/(k+1)` for every `k` (Bishop's characterisation of `|x - y| ≤ e`).
+-- `x ≈ y` is `R.Dist x y 0`, up to `0 +`.
+
+def R.Dist (x y : R) (e : Q) : Prop := (k : Nat) → Q.abs (x.seq k - y.seq k) ≤ e + (Q.invS k + Q.invS k)
+
+-- **The criterion, with a distance.** `|xₙ - yₙ| ≤ e + K/(n+1)` for every `n` gives
+-- `R.Dist x y e` (the proof of `R.eq_of_bound`, with `e`).
+def R.dist_of_bound (x y : R) (e : Q) (K : Nat)
+    (h : (n : Nat) → Q.abs (x.seq n - y.seq n) ≤ e + Q.ofNat K * Q.invS n) : R.Dist x y e :=
+  fun n => Q.le_of_forall_le_add (Q.abs (x.seq n - y.seq n)) (e + (Q.invS n + Q.invS n)) (K + 2) (fun m =>
+    let B := Q.abs (x.seq n - x.seq m) + (Q.abs (x.seq m - y.seq m) + Q.abs (y.seq m - y.seq n));
+    let C := Q.invS n + Q.invS m + ((e + Q.ofNat K * Q.invS m) + (Q.invS m + Q.invS n));
+    let D' := e + (Q.invS n + Q.invS n) + (Q.ofNat K + 2) * Q.invS m;
+    let D := e + (Q.invS n + Q.invS n) + Q.ofNat (K + 2) * Q.invS m;
+    let eCD' : C ≈ D' := q_ring! Q.invS n + Q.invS m + ((e + Q.ofNat K * Q.invS m) + (Q.invS m + Q.invS n)) ≈ e + (Q.invS n + Q.invS n) + (Q.ofNat K + 2) * Q.invS m;
+    let eD'D : D' ≈ D := Q.add_congr (Q.refl _) (Q.mul_congr (Q.symm (Q.ofNat_add2 K)) (Q.refl (Q.invS m)));
+    @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
+      (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
+
+def R.dist_of_eq {ω x y : R} (h : x ≈ y) : R.Dist x y 0 :=
+  fun k => Q.le_trans (h k) (Q.le_of_eq (q_ring! Q.invS k + Q.invS k ≈ 0 + (Q.invS k + Q.invS k)))
+def R.eq_of_dist {ω x y : R} (h : R.Dist x y 0) : x ≈ y :=
+  fun k => Q.le_trans (h k) (Q.le_of_eq (q_ring! 0 + (Q.invS k + Q.invS k) ≈ Q.invS k + Q.invS k))
+
+-- ## Completeness
+--
+-- A sequence of reals is regular when `R.Dist (X m) (X n) (1/(m+1) + 1/(n+1))`. Its
+-- limit is the diagonal `yₙ = (X (2n+1))_(2n+1)`, and `R.Dist (X n) y (1/(n+1))`.
+
+def R.RegSeq (X : Nat → R) : Prop := (m n : Nat) → R.Dist (X m) (X n) (Q.invS m + Q.invS n)
+
+def R.limSeq (X : Nat → R) (n : Nat) : Q := (X (R.addIdx n)).seq (R.addIdx n)
+
+-- |(X M)_M - (X N)_N| ≤ 2/(M+1) + 2/(N+1) + 4/(k+1), for every k
+def R.diag_bound (X : Nat → R) (h : R.RegSeq X) (M N k : Nat) :
+    Q.abs ((X M).seq M - (X N).seq N) ≤ (Q.invS M + Q.invS M + (Q.invS N + Q.invS N)) + Q.ofNat 4 * Q.invS k :=
+  Q.chainEq _ (Q.invS M + Q.invS k + ((Q.invS M + Q.invS N + (Q.invS k + Q.invS k)) + (Q.invS k + Q.invS N))) _
+    (Q.chain _ (Q.abs ((X M).seq M - (X M).seq k) + (Q.abs ((X M).seq k - (X N).seq k) + Q.abs ((X N).seq k - (X N).seq N))) _
+      (Q.abs_sub_le3 ((X M).seq M) ((X M).seq k) ((X N).seq k) ((X N).seq N))
+      (Q.add_le_add3 ((X M).reg M k) (h M N k) ((X N).reg k N)))
+    (q_ring! Q.invS M + Q.invS k + ((Q.invS M + Q.invS N + (Q.invS k + Q.invS k)) + (Q.invS k + Q.invS N))
+       ≈ (Q.invS M + Q.invS M + (Q.invS N + Q.invS N)) + 4 * Q.invS k)
+
+def R.lim (X : Nat → R) (h : R.RegSeq X) : R := R.mk (R.limSeq X) (fun m n =>
+  let M := R.addIdx m;
+  let N := R.addIdx n;
+  Q.chainEq _ (Q.invS M + Q.invS M + (Q.invS N + Q.invS N)) _
+    (Q.le_of_forall_le_add _ _ 4 (fun k => R.diag_bound X h M N k))
+    (Q.add_congr (Q.invS_double m) (Q.invS_double n)))
+
+-- **The completeness theorem**: a regular sequence of reals converges to its limit,
+-- `|Xₙ - lim X| ≤ 1/(n+1)`.
+def R.lim_spec (X : Nat → R) (h : R.RegSeq X) (n : Nat) : R.Dist (X n) (R.lim X h) (Q.invS n) :=
+  fun k =>
+    let K := R.addIdx k;
+    -- for every j: |(X n)_k - (X K)_K| ≤ |(X n)_k - (X n)_j| + |(X n)_j - (X K)_j| + |(X K)_j - (X K)_K|
+    Q.chainEq _ (Q.invS n + (Q.invS K + Q.invS K) + Q.invS k) _
+      (Q.le_of_forall_le_add _ _ 4 (fun j =>
+        Q.chainEq _ (Q.invS k + Q.invS j + ((Q.invS n + Q.invS K + (Q.invS j + Q.invS j)) + (Q.invS j + Q.invS K))) _
+          (Q.chain _ (Q.abs ((X n).seq k - (X n).seq j) + (Q.abs ((X n).seq j - (X K).seq j) + Q.abs ((X K).seq j - (X K).seq K))) _
+            (Q.abs_sub_le3 ((X n).seq k) ((X n).seq j) ((X K).seq j) ((X K).seq K))
+            (Q.add_le_add3 ((X n).reg k j) (h n K j) ((X K).reg j K)))
+          (q_ring! Q.invS k + Q.invS j + ((Q.invS n + Q.invS K + (Q.invS j + Q.invS j)) + (Q.invS j + Q.invS K))
+             ≈ Q.invS n + (Q.invS K + Q.invS K) + Q.invS k + 4 * Q.invS j)))
+      (Q.trans (Q.add_congr (Q.add_congr (Q.refl (Q.invS n)) (Q.invS_double k)) (Q.refl (Q.invS k)))
+        (q_ring! Q.invS n + Q.invS k + Q.invS k ≈ Q.invS n + (Q.invS k + Q.invS k)))
