@@ -16,9 +16,9 @@ def congrArg2 {A B C : Type} (f : A → B → C) {a a' : A} {b b' : B} (e : a = 
     f a b = f a' b' :=
   Eq.trans (Eq.congrArg (fun x => f x b) e) (Eq.congrArg (f a') e')
 -- transport a proposition along an equation
-def Eq.mpr' {A : Type} {a b : A} (P : A → Prop) (e : a = b) (h : P b) : P a :=
+def Eq.mpr' {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P b) : P a :=
   Eq.substProp P (Eq.symm e) h
-def Eq.mp' {A : Type} {a b : A} (P : A → Prop) (e : a = b) (h : P a) : P b :=
+def Eq.mp' {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
   Eq.substProp P e h
 
 -- ## Addition

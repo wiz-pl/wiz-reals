@@ -209,7 +209,7 @@ def NE.prove (ρ : List Nat) (a b : NE) (h : NE.norm a = NE.norm b) : NE.eval ρ
 
 -- ## The macro: `nat_ring! lhs = rhs`
 --
--- Reification is syntactic: `+`, `*`, parentheses and numerals are understood, every
+-- Reification is syntactic: `+`, `*`, parentheses, numerals and `Nat.succ` are understood, every
 -- other subterm is an atom (two atoms are the same when their syntax is).
 
 partial def Syn.beq : {ω b c : Bool} → SyntaxF b → SyntaxF c → Bool
@@ -228,45 +228,64 @@ def Reify.find (x : Syntax) : List Syntax → Nat
 def Reify.snoc (x : Syntax) : List Syntax → List Syntax
   | .nil => .cons x .nil
   | .cons y ys => .cons y (Reify.snoc x ys)
-def Reify.atom (x : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+-- The reifier serves `nat_ring!` (`int = false`: constructors `NE.*`, and `Nat.succ`)
+-- and `int_ring!` (`int = true`: constructors `IE.*`, and `-`, both binary and unary).
+def Reify.ctor (int : Bool) (c : String) : Syntax :=
+  Syntax.mkVar (String.append (if int then "IE." else "NE.") c)
+def Reify.atom (int : Bool) (x : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
   let i := Reify.find x atoms;
   let atoms' := if Nat.beq i (List.length atoms) then Reify.snoc x atoms else atoms;
   let n := Syntax.mkNode "term.num" (.cons (Syntax.mkNode "num" (.cons (.atom (Syntax.decimal i)) .nil)) .nil);
-  (`(term| NE.atom $n), atoms')
+  (Syntax.mkApp (Reify.ctor int "atom") (.cons n .nil), atoms')
 
--- `binop k stx`: the two operands, if `stx` is the binary operator `k`
+-- `Nat.succ t` (as `1 + t`, which computes to it)
+def Reify.isSucc (stx : Syntax) : Bool := match Syntax.getArg (Syntax.getArg stx 0) 0 with
+  | .ident f => Bool.and (Expr.nameEq f "Nat.succ") (match Syntax.getArg stx 1 with
+    | .node _ (.cons _ .nil) => .true
+    | _ => .false)
+  | _ => .false
+def Reify.succArg (stx : Syntax) : Syntax := Syntax.getArg (Syntax.getArg stx 1) 0
+
 mutual
-def Reify.go (stx : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+def Reify.go (int : Bool) (stx : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
   match stx with
   | .node k args =>
-    if Expr.nameEq k "term.+" then Reify.bin "NE.add" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
-    else if Expr.nameEq k "term.*" then Reify.bin "NE.mul" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
-    else if Expr.nameEq k "term.paren" then Reify.go (SyntaxF.nth args 1) atoms
-    else if Expr.nameEq k "term.num" then (`(term| NE.lit $stx), atoms)
-    else Reify.atom stx atoms
-  | _ => Reify.atom stx atoms
-def Reify.bin (f : String) (a b : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
-  let ra := Reify.go a atoms;
-  let rb := Reify.go b ra.2;
-  (Syntax.mkApp (Syntax.mkVar f) (.cons ra.1 (.cons rb.1 .nil)), rb.2)
+    if Expr.nameEq k "term.+" then Reify.bin int "add" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.*" then Reify.bin int "mul" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.paren" then Reify.go int (SyntaxF.nth args 1) atoms
+    else if Expr.nameEq k "term.num" then (Syntax.mkApp (Reify.ctor int "lit") (.cons stx .nil), atoms)
+    else if Bool.and int (Expr.nameEq k "term.-") then Reify.bin int "sub" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Bool.and int (Expr.nameEq k "term.neg") then
+      let r := Reify.go int (SyntaxF.nth args 1) atoms;
+      (Syntax.mkApp (Reify.ctor int "neg") (.cons r.1 .nil), r.2)
+    else if Bool.and (Bool.not int) (Reify.isSucc stx) then Reify.bin int "add" `(term| 1) (Reify.succArg stx) atoms
+    else Reify.atom int stx atoms
+  | _ => Reify.atom int stx atoms
+def Reify.bin (int : Bool) (f : String) (a b : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+  let ra := Reify.go int a atoms;
+  let rb := Reify.go int b ra.2;
+  (Syntax.mkApp (Reify.ctor int f) (.cons ra.1 (.cons rb.1 .nil)), rb.2)
 end
 
 def Reify.list : List Syntax → Syntax
   | .nil => `(term| List.nil)
   | .cons x xs => let r := Reify.list xs; `(term| List.cons $x $r)
 
-def NatRing.expand : Macro := fun stx =>
+-- `(P.prove ρ e₁ e₂ rfl : lhs = rhs)`
+def Reify.expand (int : Bool) (stx : Syntax) : MacroM Syntax :=
   let eqn := Syntax.getArg stx 1;
   match eqn with
   | .node k args =>
     if Expr.nameEq k "term.eq" then
-      let l := Reify.go (SyntaxF.nth args 0) .nil;
-      let r := Reify.go (SyntaxF.nth args 2) l.2;
+      let l := Reify.go int (SyntaxF.nth args 0) .nil;
+      let r := Reify.go int (SyntaxF.nth args 2) l.2;
       let ρ := Reify.list r.2;
       let el := l.1;
       let er := r.1;
-      MacroM.pure `(term| (NE.prove $ρ $el $er rfl : $eqn))
-    else MacroM.throw "nat_ring!: expected an equation `lhs = rhs`"
-  | _ => MacroM.throw "nat_ring!: expected an equation `lhs = rhs`"
+      let pr := Syntax.mkApp (Reify.ctor int "prove") (.cons ρ (.cons el (.cons er (.cons `(term| rfl) .nil))));
+      MacroM.pure `(term| ($pr : $eqn))
+    else MacroM.throw "ring!: expected an equation `lhs = rhs`"
+  | _ => MacroM.throw "ring!: expected an equation `lhs = rhs`"
+def NatRing.expand : Macro := fun stx => Reify.expand .false stx
 syntax:lead (name := natRing) "nat_ring!" term : term
 attribute [macro term.natRing] NatRing.expand
