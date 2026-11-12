@@ -1,0 +1,183 @@
+import Reals.Real
+-- Multiplication of real numbers (Bishop's: `(xy)ₙ = x_j y_j` with `j + 1 = 2k(n + 1)`,
+-- `k` a bound of both factors).
+
+def Q.ofNat_add' (a b : Nat) : Int.ofNat (a + b) * (1 * 1) = (Int.ofNat a * 1 + Int.ofNat b * 1) * 1 :=
+  congrArg Int.ofNat (nat_ring! (a + b) * (1 * 1) = (a * 1 + b * 1) * 1)
+def Q.ofNat_add (a b : Nat) : Q.ofNat (a + b) ≈ Q.ofNat a + Q.ofNat b := Q.ofNat_add' a b
+def Q.ofNat_mul' (a b : Nat) : Int.ofNat (a * b) * (1 * 1) = Int.ofNat a * Int.ofNat b * 1 :=
+  congrArg Int.ofNat (nat_ring! (a * b) * (1 * 1) = a * b * 1)
+def Q.ofNat_mul (a b : Nat) : Q.ofNat (a * b) ≈ Q.ofNat a * Q.ofNat b := Q.ofNat_mul' a b
+def Q.ofNat_le (a b : Nat) (h : Nat.Le a b) : Q.ofNat a ≤ Q.ofNat b :=
+  Int.ofNat_le (a * 1) (b * 1) (Nat.mul_le_mul_right 1 a b h)
+def Q.ofNat_nonneg (a : Nat) : 0 ≤ Q.ofNat a := @Q.le_of_nonneg (Q.ofNat a) (Int.nonneg_ofNat a)
+
+-- ## A bound of a real number
+
+def R.bnd (x : R) : Nat := Q.ceil (Q.abs (x.seq 0)) + 2
+def R.abs_le_bnd (x : R) (n : Nat) : Q.abs (x.seq n) ≤ Q.ofNat (R.bnd x) :=
+  let c := Q.ceil (Q.abs (x.seq 0));
+  -- |xₙ| ≤ |x₀| + |xₙ - x₀| ≤ |x₀| + (1/(n+1) + 1) ≤ c + 2
+  Q.chainEq _ (Q.ofNat c + 2) _
+    (Q.chain _ (Q.abs (x.seq 0) + Q.abs (x.seq n - x.seq 0)) _
+      (Q.le_congr (Q.abs_congr (q_ring! x.seq 0 + (x.seq n - x.seq 0) ≈ x.seq n)) (Q.refl _) (Q.abs_add (x.seq 0) (x.seq n - x.seq 0)))
+      (Q.add_le_add (Q.le_of_lt (Q.lt_ceil (Q.abs (x.seq 0))))
+        (Q.le_trans (x.reg n 0) (Q.add_le_add (Q.invS_le_one n) (Q.le_refl 1)))))
+    (Q.symm (Q.ofNat_add2 c))
+def R.bnd_pos (x : R) : 0 ≤ Q.ofNat (R.bnd x) := Q.ofNat_nonneg (R.bnd x)
+
+-- ## Products of close numbers are close
+
+def Q.mul_le_mul_abs {ω a b : Q} (A B : Q) (ha : Q.abs a ≤ A) (hb : Q.abs b ≤ B) : Q.abs (a * b) ≤ A * B :=
+  Q.chain _ (A * Q.abs b) _
+    (Q.chain _ (Q.abs a * Q.abs b) _ (Q.le_of_eq (Q.abs_mul a b)) (Q.mul_le_mul_of_nonneg_right (Q.abs b) (Q.abs_nonneg b) ha))
+    (Q.mul_le_mul_of_nonneg_left A (Q.le_trans (Q.abs_nonneg a) ha) hb)
+-- `ab - a'b' = a(b - b') + b'(a - a')`
+def Q.prod_close (a b a' b' A B e : Q) (ha : Q.abs a ≤ A) (hb' : Q.abs b' ≤ B)
+    (h1 : Q.abs (b - b') ≤ e) (h2 : Q.abs (a - a') ≤ e) : Q.abs (a * b - a' * b') ≤ (A + B) * e :=
+  Q.chainEq _ (A * e + B * e) _
+    (Q.chain _ (Q.abs (a * (b - b')) + Q.abs (b' * (a - a'))) _
+      (Q.le_congr (Q.abs_congr (q_ring! a * (b - b') + b' * (a - a') ≈ a * b - a' * b')) (Q.refl _) (Q.abs_add _ _))
+      (Q.add_le_add (Q.mul_le_mul_abs A e ha h1) (Q.mul_le_mul_abs B e hb' h2)))
+    (q_ring! A * e + B * e ≈ (A + B) * e)
+
+-- equal reals at two late indices
+def R.close {ω x x' : R} (hx : x ≈ x') (i i' n : Nat) (hi : Nat.Le n i) (hi' : Nat.Le n i') :
+    Q.abs (x.seq i - x'.seq i') ≤ 4 * Q.invS n :=
+  let a := Q.invS_anti n i hi;
+  let b := Q.invS_anti n i' hi';
+  Q.chainEq _ (Q.invS n + Q.invS n + (Q.invS n + Q.invS n)) _
+    (Q.chain _ (Q.abs (x.seq i - x.seq i') + Q.abs (x.seq i' - x'.seq i')) _
+      (Q.abs_sub_le (x.seq i) (x.seq i') (x'.seq i'))
+      (Q.add_le_add (Q.le_trans (x.reg i i') (Q.add_le_add a b)) (Q.le_trans (hx i') (Q.add_le_add b b))))
+    (q_ring! Q.invS n + Q.invS n + (Q.invS n + Q.invS n) ≈ 4 * Q.invS n)
+
+-- ## The product
+
+def R.mulK (x y : R) : Nat := R.bnd x + R.bnd y
+def R.mulIdx (x y : R) (n : Nat) : Nat := Q.scaleIdx (Nat.succ (R.mulK x y)) n
+def R.bnd_le_k (x y : R) : Q.ofNat (R.bnd x) ≤ Q.ofNat (Nat.succ (R.mulK x y)) :=
+  Q.ofNat_le _ _ (Nat.le_trans (R.bnd x) (R.mulK x y) (Nat.succ (R.mulK x y)) (Nat.le_add_right _ _) (Nat.le_succ _))
+def R.bnd_le_k' (x y : R) : Q.ofNat (R.bnd y) ≤ Q.ofNat (Nat.succ (R.mulK x y)) :=
+  Q.ofNat_le _ _ (Nat.le_trans (R.bnd y) (R.mulK x y) (Nat.succ (R.mulK x y)) (Nat.le_add_left _ _) (Nat.le_succ _))
+
+def R.mul (x y : R) : R := R.mk (fun n => x.seq (R.mulIdx x y n) * y.seq (R.mulIdx x y n)) (fun m n =>
+  let k := Nat.succ (R.mulK x y);
+  let a := R.mulIdx x y m;
+  let b := R.mulIdx x y n;
+  let K := Q.ofNat k;
+  let e := Q.invS a + Q.invS b;
+  -- |xₐyₐ - x_b y_b| ≤ (k + k)(1/(a+1) + 1/(b+1)) = 1/(m+1) + 1/(n+1)
+  Q.chainEq _ ((K + K) * e) _
+    (Q.prod_close (x.seq a) (y.seq a) (x.seq b) (y.seq b) K K e
+      (Q.le_trans (R.abs_le_bnd x a) (R.bnd_le_k x y)) (Q.le_trans (R.abs_le_bnd y b) (R.bnd_le_k' x y))
+      (y.reg a b) (x.reg a b))
+    (Q.trans (Q.mul_congr (Q.symm (Q.ofNat_add k k)) (Q.refl e))
+      (Q.trans (q_ring! Q.ofNat (k + k) * (Q.invS a + Q.invS b) ≈ Q.ofNat (k + k) * Q.invS a + Q.ofNat (k + k) * Q.invS b)
+        (Q.add_congr (Q.invS_scale (R.mulK x y) m) (Q.invS_scale (R.mulK x y) n)))))
+instance : Mul R := Mul.mk R.mul
+
+-- ## Laws of multiplication
+
+def Q.ofNat_4ab (a b : Nat) : Q.ofNat (4 * (a + b)) ≈ 4 * (Q.ofNat a + Q.ofNat b) :=
+  Q.trans (Q.ofNat_mul 4 (a + b)) (Q.mul_congr (Q.refl 4) (Q.ofNat_add a b))
+def R.mulIdx_ge (x y : R) (n : Nat) : Nat.Le n (R.mulIdx x y n) := Nat.le_scaleIdx (R.mulK x y) n
+
+def R.mul_close4 {ω x x' y y' : R} (hx : x ≈ x') (hy : y ≈ y') (i j i' j' n : Nat)
+    (hi : Nat.Le n i) (hj : Nat.Le n j) (hi' : Nat.Le n i') (hj' : Nat.Le n j') :
+    Q.abs (x.seq i * y.seq j - x'.seq i' * y'.seq j') ≤ Q.ofNat (4 * (R.bnd x + R.bnd y')) * Q.invS n :=
+  let A := Q.ofNat (R.bnd x);
+  let B := Q.ofNat (R.bnd y');
+  Q.chainEq _ ((A + B) * (4 * Q.invS n)) _
+    (Q.prod_close (x.seq i) (y.seq j) (x'.seq i') (y'.seq j') A B (4 * Q.invS n)
+      (R.abs_le_bnd x i) (R.abs_le_bnd y' j') (R.close hy j j' n hj hj') (R.close hx i i' n hi hi'))
+    (Q.trans (q_ring! (A + B) * (4 * Q.invS n) ≈ 4 * (A + B) * Q.invS n)
+      (Q.mul_congr (Q.symm (Q.ofNat_4ab (R.bnd x) (R.bnd y'))) (Q.refl (Q.invS n))))
+def R.mul_close2 {ω x x' y y' : R} (hx : x ≈ x') (hy : y ≈ y') (i j i' n : Nat)
+    (hi : Nat.Le n i) (hj : Nat.Le n j) (hi' : Nat.Le n i') :
+    Q.abs (x.seq i * y.seq j - x'.seq i' * y'.seq i') ≤ Q.ofNat (4 * (R.bnd x + R.bnd y')) * Q.invS n :=
+  R.mul_close4 hx hy i j i' i' n hi hj hi' hi'
+def R.mul_close {ω x x' y y' : R} (hx : x ≈ x') (hy : y ≈ y') (i i' n : Nat) (hi : Nat.Le n i) (hi' : Nat.Le n i') :
+    Q.abs (x.seq i * y.seq i - x'.seq i' * y'.seq i') ≤ Q.ofNat (4 * (R.bnd x + R.bnd y')) * Q.invS n :=
+  R.mul_close2 hx hy i i i' n hi hi hi'
+
+def R.mul_congr {ω x x' y y' : R} (hx : x ≈ x') (hy : y ≈ y') : x * y ≈ x' * y' :=
+  R.eq_of_bound (x * y) (x' * y') (4 * (R.bnd x + R.bnd y')) (fun n =>
+    R.mul_close hx hy (R.mulIdx x y n) (R.mulIdx x' y' n) n (R.mulIdx_ge x y n) (R.mulIdx_ge x' y' n))
+
+def R.mul_comm (x y : R) : x * y ≈ y * x :=
+  R.eq_of_bound (x * y) (y * x) (4 * (R.bnd x + R.bnd y)) (fun n =>
+    let i := R.mulIdx x y n;
+    let i' := R.mulIdx y x n;
+    Q.le_congr (Q.abs_congr (q_ring! x.seq i * y.seq i - x.seq i' * y.seq i' ≈ x.seq i * y.seq i - y.seq i' * x.seq i')) (Q.refl _)
+      (R.mul_close (R.refl x) (R.refl y) i i' n (R.mulIdx_ge x y n) (R.mulIdx_ge y x n)))
+
+def R.mul_one (x : R) : x * 1 ≈ x :=
+  R.eq_of_bound (x * 1) x 2 (fun n =>
+    let i := R.mulIdx x 1 n;
+    Q.chainEq _ (Q.invS n + Q.invS n) _
+      (Q.chain _ (Q.invS i + Q.invS n) _
+        (Q.le_congr (Q.abs_congr (q_ring! x.seq i - x.seq n ≈ x.seq i * 1 - x.seq n)) (Q.refl _) (x.reg i n))
+        (Q.add_le_add_right (Q.invS n) (Q.invS_anti n i (R.mulIdx_ge x 1 n))))
+      (q_ring! Q.invS n + Q.invS n ≈ 2 * Q.invS n))
+
+def Q.distrib_diff (a b c a' b' a'' c' : Q) :
+    a * (b + c) - (a' * b' + a'' * c') ≈ (a * b - a' * b') + (a * c - a'' * c') :=
+  q_ring! a * (b + c) - (a' * b' + a'' * c') ≈ (a * b - a' * b') + (a * c - a'' * c')
+def R.mul_add (x y z : R) : x * (y + z) ≈ x * y + x * z :=
+  let K1 := 4 * (R.bnd x + R.bnd y);
+  let K2 := 4 * (R.bnd x + R.bnd z);
+  R.eq_of_bound (x * (y + z)) (x * y + x * z) (K1 + K2) (fun n =>
+    let i := R.mulIdx x (y + z) n;
+    let s := R.addIdx i;
+    let p := R.mulIdx x y (R.addIdx n);
+    let q := R.mulIdx x z (R.addIdx n);
+    let hi : Nat.Le n i := R.mulIdx_ge x (y + z) n;
+    let hs : Nat.Le n s := Nat.le_trans n i s hi (Nat.le_double_succ i);
+    let hp : Nat.Le n p := Nat.le_trans n (R.addIdx n) p (Nat.le_double_succ n) (R.mulIdx_ge x y (R.addIdx n));
+    let hq : Nat.Le n q := Nat.le_trans n (R.addIdx n) q (Nat.le_double_succ n) (R.mulIdx_ge x z (R.addIdx n));
+    Q.chainEq _ (Q.ofNat K1 * Q.invS n + Q.ofNat K2 * Q.invS n) _
+      (Q.chain _ (Q.abs (x.seq i * y.seq s - x.seq p * y.seq p) + Q.abs (x.seq i * z.seq s - x.seq q * z.seq q)) _
+        (Q.le_congr (Q.symm (Q.abs_congr (Q.distrib_diff (x.seq i) (y.seq s) (z.seq s) (x.seq p) (y.seq p) (x.seq q) (z.seq q)))) (Q.refl _)
+          (Q.abs_add _ _))
+        (Q.add_le_add (R.mul_close2 (R.refl x) (R.refl y) i s p n hi hs hp)
+          (R.mul_close2 (R.refl x) (R.refl z) i s q n hi hs hq)))
+      (Q.trans (q_ring! Q.ofNat K1 * Q.invS n + Q.ofNat K2 * Q.invS n ≈ (Q.ofNat K1 + Q.ofNat K2) * Q.invS n)
+        (Q.mul_congr (Q.symm (Q.ofNat_add K1 K2)) (Q.refl (Q.invS n)))))
+
+-- `abc - a'b'c' = (ab)(c - c') + c'(ab - a'b')`
+def Q.triple_close (a b c a' b' c' P C e f : Q) (hab : Q.abs (a * b) ≤ P) (hc' : Q.abs c' ≤ C)
+    (h1 : Q.abs (c - c') ≤ e) (h2 : Q.abs (a * b - a' * b') ≤ f) :
+    Q.abs (a * b * c - a' * (b' * c')) ≤ P * e + C * f :=
+  Q.chain _ (Q.abs (a * b * (c - c')) + Q.abs (c' * (a * b - a' * b'))) _
+    (Q.le_congr (Q.abs_congr (q_ring! a * b * (c - c') + c' * (a * b - a' * b') ≈ a * b * c - a' * (b' * c'))) (Q.refl _) (Q.abs_add _ _))
+    (Q.add_le_add (Q.mul_le_mul_abs P e hab h1) (Q.mul_le_mul_abs C f hc' h2))
+def R.mul_assoc (x y z : R) : x * y * z ≈ x * (y * z) :=
+  let bx := R.bnd x;
+  let by' := R.bnd y;
+  let bz := R.bnd z;
+  let K1 := 4 * (bx * by');
+  let K2 := bz * (4 * (bx + by'));
+  R.eq_of_bound (x * y * z) (x * (y * z)) (K1 + K2) (fun n =>
+    let i := R.mulIdx (x * y) z n;
+    let a := R.mulIdx x y i;
+    let j := R.mulIdx x (y * z) n;
+    let b := R.mulIdx y z j;
+    let hi : Nat.Le n i := R.mulIdx_ge (x * y) z n;
+    let ha : Nat.Le n a := Nat.le_trans n i a hi (R.mulIdx_ge x y i);
+    let hj : Nat.Le n j := R.mulIdx_ge x (y * z) n;
+    let hb : Nat.Le n b := Nat.le_trans n j b hj (R.mulIdx_ge y z j);
+    let hab : Q.abs (x.seq a * y.seq a) ≤ Q.ofNat bx * Q.ofNat by' :=
+      Q.mul_le_mul_abs (Q.ofNat bx) (Q.ofNat by') (R.abs_le_bnd x a) (R.abs_le_bnd y a);
+    Q.chainEq _ (Q.ofNat bx * Q.ofNat by' * (4 * Q.invS n) + Q.ofNat bz * (Q.ofNat (4 * (bx + by')) * Q.invS n)) _
+      (Q.triple_close (x.seq a) (y.seq a) (z.seq i) (x.seq j) (y.seq b) (z.seq b)
+        (Q.ofNat bx * Q.ofNat by') (Q.ofNat bz) (4 * Q.invS n) (Q.ofNat (4 * (bx + by')) * Q.invS n)
+        hab (R.abs_le_bnd z b) (R.close (R.refl z) i b n hi hb)
+        (R.mul_close4 (R.refl x) (R.refl y) a a j b n ha ha hj hb))
+      (Q.trans (Q.add_congr (Q.refl _) (Q.mul_congr (Q.refl _) (Q.mul_congr (Q.ofNat_4ab bx by') (Q.refl _))))
+        (Q.trans (q_ring! Q.ofNat bx * Q.ofNat by' * (4 * Q.invS n) + Q.ofNat bz * (4 * (Q.ofNat bx + Q.ofNat by') * Q.invS n)
+                   ≈ (4 * (Q.ofNat bx * Q.ofNat by') + Q.ofNat bz * (4 * (Q.ofNat bx + Q.ofNat by'))) * Q.invS n)
+          (Q.mul_congr (Q.symm (Q.trans (Q.ofNat_add K1 K2)
+              (Q.add_congr (Q.trans (Q.ofNat_mul 4 (bx * by')) (Q.mul_congr (Q.refl 4) (Q.ofNat_mul bx by')))
+                 (Q.trans (Q.ofNat_mul bz (4 * (bx + by'))) (Q.mul_congr (Q.refl _) (Q.ofNat_4ab bx by'))))))
+            (Q.refl (Q.invS n))))))
