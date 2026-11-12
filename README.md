@@ -3,7 +3,7 @@
 The real numbers, constructed and reasoned about in [Wiz](https://github.com/badly-drawn-wizards/wiz),
 a dependently typed language with observational type theory, and built with grail
 (Wiz's build tool). Everything is checked by the Wiz kernel; nothing is assumed
-(`#print axioms` lists only the Prelude's registered builtins).
+(`#print axioms R.sqrt2_sq`, `R.lim_spec`, `R.mul_assoc`: "does not depend on any axioms").
 
 It exists to find out how usable Wiz is for real mathematics, and to write down what
 that was like: see [FINDINGS.md](FINDINGS.md). [DESIGN.md](DESIGN.md) says why the
