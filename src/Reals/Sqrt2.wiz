@@ -53,3 +53,59 @@ def Sqrt2.approx_sq (p : Nat) : Q.abs (Sqrt2.approx p * Sqrt2.approx p - 2) ≤ 
       (Int.nonneg_mul _ PP
         (Int.nonneg_add _ 2 (Int.nonneg_add _ _ (Int.nonneg_mul 2 _ rfl hC) hB) rfl) hPP);
   Q.abs_le_of_bounds lo up
+
+-- ## √2 as a real number: `xₙ = d(n+1)/(n+1)`
+
+def Nat.mul_lt_mul_right_succ (a b c' : Nat) (h : Nat.Lt a b) : Nat.Lt (a * Nat.succ c') (b * Nat.succ c') :=
+  -- a(c'+1) < (a+1)(c'+1) ≤ b(c'+1)
+  Nat.lt_of_lt_of_le (a * Nat.succ c') (Nat.succ a * Nat.succ c') (b * Nat.succ c')
+    (Eq.mp' (fun (z : Nat) => Nat.Lt (a * Nat.succ c') z) (nat_ring! Nat.succ (a * Nat.succ c') + c' = Nat.succ a * Nat.succ c')
+      (Nat.le_add_right (Nat.succ (a * Nat.succ c')) c'))
+    (Nat.mul_le_mul_right (Nat.succ c') (Nat.succ a) b h)
+
+-- `d(M)·N < (d(N) + 1)·M`: both are `√2·M·N` rounded the right way
+def Sqrt2.cross (m n : Nat) :
+    Nat.Lt (Sqrt2.d (Nat.succ m) * Nat.succ n) (Nat.succ (Sqrt2.d (Nat.succ n)) * Nat.succ m) :=
+  let M := Nat.succ m;
+  let N := Nat.succ n;
+  let a := Sqrt2.d M;
+  let b := Nat.succ (Sqrt2.d N);
+  Nat.lt_of_mul_self_lt (a * N) (b * M)
+    (Nat.lt_of_le_of_lt (a * N * (a * N)) (2 * (M * M) * (N * N)) (b * M * (b * M))
+      (Eq.mp' (fun (z : Nat) => Nat.Le z (2 * (M * M) * (N * N))) (nat_ring! a * a * (N * N) = a * N * (a * N))
+        (Nat.mul_le_mul_right (N * N) (a * a) (2 * (M * M)) (Sqrt2.lo M)))
+      (Eq.mp' (fun (z : Nat) => Nat.Lt z (b * M * (b * M))) (nat_ring! 2 * (N * N) * (M * M) = 2 * (M * M) * (N * N))
+        (Eq.mp' (fun (z : Nat) => Nat.Lt (2 * (N * N) * (M * M)) z) (nat_ring! b * b * (M * M) = b * M * (b * M))
+          (Nat.mul_lt_mul_right_succ (2 * (N * N)) (b * b) (m + m * Nat.succ m) (Sqrt2.hi N)))))
+
+def Sqrt2.diff_le (m n : Nat) : Sqrt2.approx m - Sqrt2.approx n ≤ Q.invS n :=
+  let DM := Int.ofNat (Sqrt2.d (Nat.succ m));
+  let DN := Int.ofNat (Sqrt2.d (Nat.succ n));
+  let MM := Int.ofNat (Nat.succ m);
+  let NN := Int.ofNat (Nat.succ n);
+  -- DM·NN + 1 ≤ (DN + 1)·MM
+  let h : Int.Le (DM * NN + 1) ((DN + 1) * MM) :=
+    @Int.Le.congr (Int.ofNat (Nat.succ (Sqrt2.d (Nat.succ m) * Nat.succ n))) (Int.ofNat (Nat.succ (Sqrt2.d (Nat.succ n)) * Nat.succ m))
+      (DM * NN + 1) ((DN + 1) * MM)
+      (Int.ofNat_succ (Sqrt2.d (Nat.succ m) * Nat.succ n))
+      (@congrArg Int Int (fun z => z * MM) (Int.ofNat (Nat.succ (Sqrt2.d (Nat.succ n)))) (DN + 1) (Int.ofNat_succ (Sqrt2.d (Nat.succ n))))
+      (Int.ofNat_le _ _ (Sqrt2.cross m n));
+  Int.NonNeg.congr (int_ring! ((DN + 1) * MM - (DM * NN + 1)) * NN + NN = 1 * (MM * NN) - (DM * NN + -DN * MM) * NN)
+    (Int.nonneg_add _ NN (Int.nonneg_mul _ NN h (Int.nonneg_ofNat (Nat.succ n))) (Int.nonneg_ofNat (Nat.succ n)))
+
+def R.sqrt2 : R := R.mk Sqrt2.approx (fun m n =>
+  Q.abs_le
+    (Q.le_trans (Sqrt2.diff_le m n) (Q.le_congr (q_ring! 0 + Q.invS n ≈ Q.invS n) (Q.refl _) (Q.add_le_add_right (Q.invS n) (Q.invS_nonneg m))))
+    (Q.le_trans (Q.le_of_eq (q_ring! -(Sqrt2.approx m - Sqrt2.approx n) ≈ Sqrt2.approx n - Sqrt2.approx m))
+      (Q.le_trans (Sqrt2.diff_le n m) (Q.le_congr (q_ring! Q.invS m + 0 ≈ Q.invS m) (Q.refl _) (Q.add_le_add_left (Q.invS m) (Q.invS_nonneg n))))))
+
+def Sqrt2.err_eq' (p : Nat) : Int.ofNat 4 * (1 * Int.ofNat (Nat.succ p)) = Int.ofNat 4 * 1 * Int.ofNat (Nat.succ p) :=
+  congrArg Int.ofNat (nat_ring! 4 * (1 * Nat.succ p) = 4 * 1 * Nat.succ p)
+def Sqrt2.err_eq (p : Nat) : Sqrt2.err p ≈ 4 * Q.invS p := Sqrt2.err_eq' p
+-- **√2 · √2 = 2**
+def R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ 2 :=
+  R.eq_of_bound (R.sqrt2 * R.sqrt2) 2 4 (fun n =>
+    let j := R.mulIdx R.sqrt2 R.sqrt2 n;
+    Q.le_trans (Sqrt2.approx_sq j)
+      (Q.le_trans (Q.le_of_eq (Sqrt2.err_eq j))
+        (Q.mul_le_mul_of_nonneg_left 4 (Q.ofNat_nonneg 4) (Q.invS_anti n j (R.mulIdx_ge R.sqrt2 R.sqrt2 n)))))
