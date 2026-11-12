@@ -36,3 +36,85 @@ def R.eq_of_bound (x y : R) (k : Nat)
     let eD'D : D' ≈ D := Q.add_congr (Q.refl (Q.invS n + Q.invS n)) (Q.mul_congr (Q.symm (Q.ofNat_add2 k)) (Q.refl (Q.invS m)));
     @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
       (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
+
+-- chains with every term written out (inferring them is very slow: FINDINGS.md, S4)
+def Q.chain (a b c : Q) (h1 : a ≤ b) (h2 : b ≤ c) : a ≤ c := Q.le_trans h1 h2
+def Q.chainEq (a b c : Q) (h1 : a ≤ b) (e : b ≈ c) : a ≤ c := Q.le_trans h1 (Q.le_of_eq e)
+def Q.abs_sub_add (a b c d : Q) : Q.abs ((a + b) - (c + d)) ≤ Q.abs (a - c) + Q.abs (b - d) :=
+  Q.le_congr (Q.abs_congr (q_ring! a - c + (b - d) ≈ a + b - (c + d))) (Q.refl _) (Q.abs_add (a - c) (b - d))
+def Q.abs_zero : Q.abs 0 ≈ 0 := rfl
+def Q.abs_le_of_eq_zero {ω a : Q} (e : a ≈ 0) (b : Q) (hb : 0 ≤ b) : Q.abs a ≤ b :=
+  Q.le_trans (Q.le_of_eq (Q.trans (Q.abs_congr e) Q.abs_zero)) hb
+def Q.invS2_nonneg (n : Nat) : 0 ≤ Q.invS n + Q.invS n := Q.add_nonneg (Q.invS_nonneg n) (Q.invS_nonneg n)
+
+-- ## Rationals, negation, addition
+
+def R.ofQ (q : Q) : R := R.mk (fun _ => q) (fun m n => Q.abs_le_of_eq_zero (Q.sub_self q) _ (Q.add_nonneg (Q.invS_nonneg m) (Q.invS_nonneg n)))
+instance {ω n : Nat} : OfNat R n := OfNat.mk (R.ofQ (Q.ofNat n))
+
+def R.neg (x : R) : R := R.mk (fun n => -(x.seq n)) (fun m n =>
+  Q.le_congr (Q.symm (Q.trans (Q.abs_congr (q_ring! -(x.seq m) - -(x.seq n) ≈ -(x.seq m - x.seq n))) (Q.abs_neg _)))
+    (Q.refl _) (x.reg m n))
+
+def R.addIdx (n : Nat) : Nat := n + n + 1
+def R.add (x y : R) : R := R.mk (fun n => x.seq (R.addIdx n) + y.seq (R.addIdx n)) (fun m n =>
+  let a := R.addIdx m;
+  let b := R.addIdx n;
+  Q.chainEq _ (Q.invS a + Q.invS b + (Q.invS a + Q.invS b)) _
+    (Q.chain _ (Q.abs (x.seq a - x.seq b) + Q.abs (y.seq a - y.seq b)) _
+      (Q.abs_sub_add (x.seq a) (y.seq a) (x.seq b) (y.seq b)) (Q.add_le_add (x.reg a b) (y.reg a b)))
+    (Q.trans (q_ring! Q.invS a + Q.invS b + (Q.invS a + Q.invS b) ≈ Q.invS a + Q.invS a + (Q.invS b + Q.invS b))
+      (Q.add_congr (Q.invS_double m) (Q.invS_double n))))
+def R.sub (x y : R) : R := R.add x (R.neg y)
+instance : Add R := Add.mk R.add
+instance : Neg R := Neg.mk R.neg
+instance : Sub R := Sub.mk R.sub
+
+-- ## `≈` is an equivalence
+
+def R.refl (x : R) : x ≈ x := fun n => Q.abs_le_of_eq_zero (Q.sub_self (x.seq n)) _ (Q.invS2_nonneg n)
+def R.symm {ω x y : R} (h : x ≈ y) : y ≈ x := fun n => Q.le_trans (Q.le_of_eq (Q.abs_sub_comm (y.seq n) (x.seq n))) (h n)
+def R.trans {ω x y z : R} (h1 : x ≈ y) (h2 : y ≈ z) : x ≈ z :=
+  R.eq_of_bound x z 4 (fun n =>
+    Q.chainEq _ (Q.invS n + Q.invS n + (Q.invS n + Q.invS n)) _
+      (Q.chain _ (Q.abs (x.seq n - y.seq n) + Q.abs (y.seq n - z.seq n)) _
+        (Q.abs_sub_le (x.seq n) (y.seq n) (z.seq n)) (Q.add_le_add (h1 n) (h2 n)))
+      (q_ring! Q.invS n + Q.invS n + (Q.invS n + Q.invS n) ≈ 4 * Q.invS n))
+-- equal sequences are equal reals
+def R.ofSeqEq (x y : R) (h : (n : Nat) → x.seq n ≈ y.seq n) : x ≈ y :=
+  fun n => Q.abs_le_of_eq_zero (Q.trans (Q.sub_congr (h n) (Q.refl (y.seq n))) (Q.sub_self (y.seq n))) _ (Q.invS2_nonneg n)
+
+-- ## The additive group
+
+def R.add_congr {ω x x' y y' : R} (hx : x ≈ x') (hy : y ≈ y') : x + y ≈ x' + y' := fun n =>
+  let a := R.addIdx n;
+  Q.chainEq _ (Q.invS a + Q.invS a + (Q.invS a + Q.invS a)) _
+    (Q.chain _ (Q.abs (x.seq a - x'.seq a) + Q.abs (y.seq a - y'.seq a)) _
+      (Q.abs_sub_add (x.seq a) (y.seq a) (x'.seq a) (y'.seq a)) (Q.add_le_add (hx a) (hy a)))
+    (Q.add_congr (Q.invS_double n) (Q.invS_double n))
+def R.neg_congr {ω x x' : R} (hx : x ≈ x') : -x ≈ -x' := fun n =>
+  Q.le_congr (Q.symm (Q.trans (Q.abs_congr (q_ring! -(x.seq n) - -(x'.seq n) ≈ -(x.seq n - x'.seq n))) (Q.abs_neg _)))
+    (Q.refl _) (hx n)
+def R.add_comm (x y : R) : x + y ≈ y + x := R.ofSeqEq _ _ (fun n => Q.add_comm _ _)
+def R.add_neg (x : R) : x + -x ≈ 0 := R.ofSeqEq _ _ (fun n => Q.add_neg _)
+def R.add_zero (x : R) : x + 0 ≈ x :=
+  R.eq_of_bound _ _ 2 (fun n =>
+    let a := R.addIdx n;
+    Q.chainEq _ (Q.invS n + Q.invS n) _
+      (Q.chain _ (Q.invS a + Q.invS n) _
+        (Q.le_congr (Q.abs_congr (q_ring! x.seq a - x.seq n ≈ x.seq a + 0 - x.seq n)) (Q.refl _) (x.reg a n))
+        (Q.add_le_add_right (Q.invS n) (Q.invS_anti n a (Nat.le_double_succ n))))
+      (q_ring! Q.invS n + Q.invS n ≈ 2 * Q.invS n))
+def Q.assoc_diff (a b c d e : Q) : a + b + c - (d + (b + e)) ≈ a + c - (d + e) :=
+  q_ring! a + b + c - (d + (b + e)) ≈ a + c - (d + e)
+def R.add_assoc (x y z : R) : x + y + z ≈ x + (y + z) :=
+  R.eq_of_bound _ _ 4 (fun n =>
+    let hA : Nat.Le n (R.addIdx (R.addIdx n)) := Nat.le_trans n (R.addIdx n) (R.addIdx (R.addIdx n)) (Nat.le_double_succ n) (Nat.le_double_succ (R.addIdx n));
+    let hAn : Q.invS (R.addIdx (R.addIdx n)) ≤ Q.invS n := Q.invS_anti n (R.addIdx (R.addIdx n)) hA;
+    let han : Q.invS (R.addIdx n) ≤ Q.invS n := Q.invS_anti n (R.addIdx n) (Nat.le_double_succ n);
+    Q.chainEq _ (Q.invS n + Q.invS n + (Q.invS n + Q.invS n)) _
+      (Q.chain _ (Q.abs (x.seq (R.addIdx (R.addIdx n)) - x.seq (R.addIdx n)) + Q.abs (z.seq (R.addIdx n) - z.seq (R.addIdx (R.addIdx n)))) _
+        (Q.le_congr (Q.symm (Q.abs_congr (Q.assoc_diff (x.seq (R.addIdx (R.addIdx n))) (y.seq (R.addIdx (R.addIdx n))) (z.seq (R.addIdx n)) (x.seq (R.addIdx n)) (z.seq (R.addIdx (R.addIdx n)))))) (Q.refl _)
+          (Q.abs_sub_add (x.seq (R.addIdx (R.addIdx n))) (z.seq (R.addIdx n)) (x.seq (R.addIdx n)) (z.seq (R.addIdx (R.addIdx n)))))
+        (Q.add_le_add (Q.le_trans (x.reg (R.addIdx (R.addIdx n)) (R.addIdx n)) (Q.add_le_add hAn han)) (Q.le_trans (z.reg (R.addIdx n) (R.addIdx (R.addIdx n))) (Q.add_le_add han hAn))))
+      (q_ring! Q.invS n + Q.invS n + (Q.invS n + Q.invS n) ≈ 4 * Q.invS n))

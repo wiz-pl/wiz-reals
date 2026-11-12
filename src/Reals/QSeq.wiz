@@ -41,3 +41,27 @@ def Q.le_of_forall_le_add (a b : Q) (k : Nat) (h : (m : Nat) → a ≤ b + Q.ofN
           (Int.nonneg_add _ 1 (Int.nonneg_mul _ _ rfl (Int.nonneg_of_pos d.den d.pos)) rfl));
     absurd (Q.lt_irrefl a (Q.lt_of_le_of_lt (h m)
       (Q.lt_congr (Q.refl _) (q_ring! b + (a - b) ≈ a) (Q.add_lt_add_left b hsmall)))))
+
+-- ## Halving and scaling `1/(n+1)`
+
+def Nat.le_double_succ (n : Nat) : Nat.Le n (n + n + 1) :=
+  Nat.le_trans n (n + n) (n + n + 1) (Nat.le_add_right n n) (Nat.le_add_right (n + n) 1)
+-- `2 · 1/(2n+2) = 1/(n+1)`, stated as the integer equation it unfolds to
+def Q.invS_double' (n : Nat) :
+    (1 * Int.ofNat (Nat.succ (n + n + 1)) + 1 * Int.ofNat (Nat.succ (n + n + 1))) * Int.ofNat (Nat.succ n)
+      = 1 * (Int.ofNat (Nat.succ (n + n + 1)) * Int.ofNat (Nat.succ (n + n + 1))) :=
+  congrArg Int.ofNat (nat_ring! (1 * Nat.succ (n + n + 1) + 1 * Nat.succ (n + n + 1)) * Nat.succ n
+      = 1 * (Nat.succ (n + n + 1) * Nat.succ (n + n + 1)))
+def Q.invS_double (n : Nat) : Q.invS (n + n + 1) + Q.invS (n + n + 1) ≈ Q.invS n := Q.invS_double' n
+
+-- `(2k) · 1/(2k(n+1)) = 1/(n+1)`, for `k = k' + 1`
+def Q.scaleIdx (k n : Nat) : Nat := Nat.pred ((k + k) * Nat.succ n)
+def Q.invS_scale' (k' n : Nat) :
+    Int.ofNat (Nat.succ k' + Nat.succ k') * 1 * Int.ofNat (Nat.succ n)
+      = 1 * (1 * Int.ofNat (Nat.succ (Q.scaleIdx (Nat.succ k') n))) :=
+  congrArg Int.ofNat (nat_ring! (Nat.succ k' + Nat.succ k') * 1 * Nat.succ n = 1 * (1 * ((Nat.succ k' + Nat.succ k') * Nat.succ n)))
+def Q.invS_scale (k' n : Nat) : Q.ofNat (Nat.succ k' + Nat.succ k') * Q.invS (Q.scaleIdx (Nat.succ k') n) ≈ Q.invS n :=
+  Q.invS_scale' k' n
+-- (`Q.scaleIdx (k' + 1) n` computes to `n + (k' + (k' + 1)) · (n + 1)`)
+def Nat.le_scaleIdx (k' n : Nat) : Nat.Le n (Q.scaleIdx (Nat.succ k') n) :=
+  Nat.le_add_right n ((k' + Nat.succ k') * Nat.succ n)

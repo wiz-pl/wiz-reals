@@ -222,3 +222,16 @@ In `-(ZPoly.eval ρ p) = -1 * 1 * ZPoly.eval ρ p` the subterm `-1 * 1` has only
 numerals, gets the default type `Nat`, and fails ("failed to synthesize an instance of
 Neg Nat"); `-1 * x` is fine. Here: `(-1 : Int) * 1 * …` (the reifier looks through
 ascriptions).
+
+### S4. A wrong proof in a chain of inequalities takes minutes to be rejected
+
+In `R.add_assoc` (src/Reals/Real.wiz), a congruence was used in the wrong direction:
+`Q.le_congr (Q.abs_congr e) (Q.refl _) h` where `Q.le_congr` wanted `Q.symm (…)`. The
+right proof checks in 1.5 s; the wrong one did not produce its type error within
+180 s (`light`'s limit; the first version of `R.eq_of_bound` did the same). The
+unifier, failing to match `Q.abs (a + b + c - (d + (b + e)))` against
+`Q.abs (a + c - (d + e))`, apparently unfolds `Q.add`/`Q.sub` (each of which uses its
+arguments twice, in the numerator and the denominator) into ever larger integer
+terms instead of failing at the first rigid mismatch. In practice this means a
+typo costs a three-minute wait and no error message; the workaround is to bisect by
+hand (a script that checks growing prefixes of the file with a 60 s limit).
