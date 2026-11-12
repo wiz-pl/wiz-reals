@@ -1,0 +1,38 @@
+import Reals.QSeq
+-- The real numbers: regular sequences of rationals (Bishop), up to `≈`.
+--
+-- A real number is a sequence `x : Nat → Q` with `|x m - x n| ≤ 1/(m+1) + 1/(n+1)`
+-- (Bishop's `1/m + 1/n`, shifted so that the index starts at 0). Two are equal when
+-- `|x n - y n| ≤ 2/(n+1)` for every `n`. DESIGN.md says why.
+
+structure R where
+  seq : Nat → Q
+  reg : (m n : Nat) → Q.abs (seq m - seq n) ≤ Q.invS m + Q.invS n
+
+def R.Eq (x y : R) : Prop := (n : Nat) → Q.abs (x.seq n - y.seq n) ≤ Q.invS n + Q.invS n
+instance : Equiv R := Equiv.mk R.Eq
+
+-- (an equation of `Int.ofNat`s, which computes to one of naturals)
+def Q.ofNat_add2' (k : Nat) : Int.ofNat (k + 2) * (1 * 1) = (Int.ofNat k * 1 + 2 * 1) * 1 :=
+  congrArg Int.ofNat (nat_ring! (k + 2) * (1 * 1) = (k * 1 + 2 * 1) * 1)
+def Q.ofNat_add2 (k : Nat) : Q.ofNat (k + 2) ≈ Q.ofNat k + 2 := Q.ofNat_add2' k
+-- three steps of the triangle inequality
+def Q.abs_sub_le3 (a b c d : Q) : Q.abs (a - d) ≤ Q.abs (a - b) + (Q.abs (b - c) + Q.abs (c - d)) :=
+  Q.le_trans (Q.abs_sub_le a b d) (Q.add_le_add_left (Q.abs (a - b)) (Q.abs_sub_le b c d))
+def Q.add_le_add3 {ω a a' b b' c c' : Q} (ha : a ≤ a') (hb : b ≤ b') (hc : c ≤ c') : a + (b + c) ≤ a' + (b' + c') :=
+  Q.add_le_add ha (Q.add_le_add hb hc)
+
+-- **The criterion for equality.** If the distance at `n` is at most `k/(n+1)`, the two
+-- are equal: for every `m`, `|xₙ - yₙ| ≤ |xₙ - xₘ| + |xₘ - yₘ| + |yₘ - yₙ| ≤
+-- 2/(n+1) + (k+2)/(m+1)`, so `|xₙ - yₙ| ≤ 2/(n+1)` (Q.le_of_forall_le_add).
+def R.eq_of_bound (x y : R) (k : Nat)
+    (h : (n : Nat) → Q.abs (x.seq n - y.seq n) ≤ Q.ofNat k * Q.invS n) : x ≈ y :=
+  fun n => Q.le_of_forall_le_add (Q.abs (x.seq n - y.seq n)) (Q.invS n + Q.invS n) (k + 2) (fun m =>
+    let B := Q.abs (x.seq n - x.seq m) + (Q.abs (x.seq m - y.seq m) + Q.abs (y.seq m - y.seq n));
+    let C := Q.invS n + Q.invS m + (Q.ofNat k * Q.invS m + (Q.invS m + Q.invS n));
+    let D' := Q.invS n + Q.invS n + (Q.ofNat k + 2) * Q.invS m;
+    let D := Q.invS n + Q.invS n + Q.ofNat (k + 2) * Q.invS m;
+    let eCD' : C ≈ D' := q_ring! Q.invS n + Q.invS m + (Q.ofNat k * Q.invS m + (Q.invS m + Q.invS n)) ≈ Q.invS n + Q.invS n + (Q.ofNat k + 2) * Q.invS m;
+    let eD'D : D' ≈ D := Q.add_congr (Q.refl (Q.invS n + Q.invS n)) (Q.mul_congr (Q.symm (Q.ofNat_add2 k)) (Q.refl (Q.invS m)));
+    @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
+      (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))

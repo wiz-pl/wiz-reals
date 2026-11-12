@@ -1,0 +1,43 @@
+import Reals.QLaws
+-- The rationals `1/(n+1)` and what regular sequences need of them.
+
+def Q.invS (n : Nat) : Q := Q.mk 1 (Int.ofNat (Nat.succ n)) (Int.ofNat_succ_pos n)
+
+def Q.invS_pos (n : Nat) : 0 < Q.invS n := @Q.lt_of_pos (Q.invS n) (Int.ofNat_succ_pos 0)
+def Q.invS_nonneg (n : Nat) : 0 ≤ Q.invS n := Q.le_of_lt (Q.invS_pos n)
+
+def Int.ofNat_le (m n : Nat) (h : Nat.Le m n) : Int.Le (Int.ofNat m) (Int.ofNat n) :=
+  Int.NonNeg.congr
+    (Eq.symm (Eq.trans (congrArg2 (fun x y => x - y) (Int.ofNat_pair n) (Int.ofNat_pair m)) (Int.ofPair_sub n 0 m 0)))
+    (Int.ofPair_nonneg (n + 0) (0 + m) (Eq.mpr' (fun (z : Nat) => Nat.Le m z) (Nat.add_zero n) h))
+-- `1/(n+1) ≤ 1/(m+1)` when `m ≤ n`
+def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
+  Int.Le.congr (int_ring! Int.ofNat (Nat.succ m) = 1 * Int.ofNat (Nat.succ m)) (int_ring! Int.ofNat (Nat.succ n) = 1 * Int.ofNat (Nat.succ n))
+    (Int.ofNat_le (Nat.succ m) (Nat.succ n) h)
+def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.le_zero n)
+
+-- `(k + 1) · 1/(n+1)` in terms of the integers
+def Q.invS_den (n : Nat) : (Q.invS n).den = Int.ofNat n + 1 := Int.ofNat_succ n
+
+-- ## Archimedes: what is below `b + k/(m+1)` for every `m` is below `b`
+
+def Int.le_mul_of_one_le (d x : Int) (hd : Int.Le 1 d) (hx : Int.NonNeg x) : Int.Le x (d * x) :=
+  Int.Le.congr (int_ring! 1 * x = x) (refl (d * x)) (Int.mul_le_mul_of_nonneg_right x 1 d hx hd)
+
+def Q.le_of_forall_le_add (a b : Q) (k : Nat) (h : (m : Nat) → a ≤ b + Q.ofNat k * Q.invS m) : a ≤ b :=
+  Or.elim (Q.le_or_lt a b) (fun h' => h') (fun (hlt : b < a) =>
+    let d := a - b;
+    let hd : Q.Pos d := Q.lt_iff_mp hlt;
+    let m := k * Int.natAbs d.den;
+    -- k · 1/(m+1) < d: as integers, k·1·dd + 1 ≤ dn·(1·(k·dd + 1))
+    let em : Int.ofNat (Nat.succ m) = Int.ofNat k * d.den + 1 :=
+      @Eq.trans Int (Int.ofNat (Nat.succ m)) (Int.ofNat m + 1) (Int.ofNat k * d.den + 1) (Int.ofNat_succ m)
+        (congrArg (fun z => Int.ofNat k * z + 1) (Eq.trans (Int.ofNat_natAbs d.den) (Int.abs_of_nonneg d.den (Int.nonneg_of_pos d.den d.pos))));
+    let hsmall : Q.ofNat k * Q.invS m < d :=
+      Int.Le.congr (int_ring! Int.ofNat k * d.den + 1 = Int.ofNat k * 1 * d.den + 1)
+        (Eq.trans (int_ring! d.num * (Int.ofNat k * d.den + 1) = d.num * (1 * (Int.ofNat k * d.den + 1)))
+          (congrArg (fun z => d.num * (1 * z)) (Eq.symm em)))
+        (Int.le_mul_of_one_le d.num (Int.ofNat k * d.den + 1) (Int.one_le_of_pos d.num hd)
+          (Int.nonneg_add _ 1 (Int.nonneg_mul _ _ rfl (Int.nonneg_of_pos d.den d.pos)) rfl));
+    absurd (Q.lt_irrefl a (Q.lt_of_le_of_lt (h m)
+      (Q.lt_congr (Q.refl _) (q_ring! b + (a - b) ≈ a) (Q.add_lt_add_left b hsmall)))))
