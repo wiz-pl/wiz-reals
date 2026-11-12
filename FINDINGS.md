@@ -158,3 +158,67 @@ fails after 17 s ("outside the pattern fragment": the holes under `fun y` become
 lemma `Int.ofPair_sub`) makes the whole file check in about 3 s, so the time goes into
 the failure, probably into unfolding `Int.ofPair` (a `match` on `Nat.sub`) while
 trying to unify.
+
+### S2. `rfl` on two equal closed lists blows up
+
+An equation of two closed values of a data type computes (OTT) into a Σ of the
+equations of their parts, with casts for the later fields. For computed lists this is
+far more expensive than comparing them:
+
+```
+import Int
+def ins (x : Nat) : List Nat → List Nat
+  | .nil => .cons x .nil
+  | .cons y ys => if Nat.le x y then .cons x (.cons y ys) else .cons y (ins x ys)
+def sort : List Nat → List Nat
+  | .nil => .nil
+  | .cons x xs => ins x (sort xs)
+def mk : Nat → List Nat
+  | .zero => .nil
+  | .succ n => .cons (Nat.mod (n * 7) 13) (mk n)
+def chk : sort (mk 36) = List.append (sort (mk 36)) .nil := rfl
+```
+
+N = 12: 0.4 s; N = 24: 4.9 s; N = 36: killed by `light` at 2 GB. The same check
+through a Boolean `lbeq (sort (mk 36)) (…) = .true := rfl` takes 0.5 s. This is how
+the reflective provers first compared normal forms (`rfl : norm a = norm b`): an
+identity with 36 monomials ran out of memory. Here: `Poly.beq`/`ZPoly.beq` and a
+soundness lemma (`Poly.beq_eval`), in src/Reals/Ring.wiz and src/Reals/ZRing.wiz.
+
+### S3. The same proof is 8× slower under an ascription
+
+```
+import Reals.QRing
+-- 1.3 s:
+def xI (p q r : Q) : p + q + r ≈ p + (q + r) :=
+  QE.prove (List.cons p (List.cons q (List.cons r List.nil)))
+    (QE.add (QE.add (QE.atom 0) (QE.atom 1)) (QE.atom 2)) (QE.add (QE.atom 0) (QE.add (QE.atom 1) (QE.atom 2))) rfl
+-- 9.7 s: the same term as `(… : p + q + r ≈ p + (q + r))`
+-- 9.6 s: as `let h : p + q + r ≈ p + (q + r) := …; h`
+-- 11 s:  as `the (p + q + r ≈ p + (q + r)) (…)` with `def the (T : Prop) (t : T) : T := t`
+-- 1.4 s: as the first component of a pair whose type is given
+```
+
+With four atoms (`p + q + r + s ≈ p + (q + (r + s))`) the ascribed form takes 20 s.
+It looks as if, when the term is elaborated first and its type
+`QE.eval ρ e₁ ≈ QE.eval ρ e₂` is then unified with the stated type, the elaborator's
+unifier unfolds the evaluator very inefficiently, while the kernel (which checks both
+versions) is fast. Here: the macros emit the bare proof, so they are only used where
+the equation is the expected type (src/Reals/Ring.wiz, `Reify.expandWith`).
+
+### P6. `let a := …; let b := …;` on one line ends the term
+
+```
+  let ha := QE.sound ρ a; let hb := QE.sound ρ b;
+  Eq.trans (congrArg2 …) (…)
+```
+
+parses the body as `Eq.trans` alone ("expected 'def', …" at the first argument, and a
+type mismatch for the unapplied `Eq.trans`). One `let` per line works.
+
+### P7. `-1 * 1 * x` at `Int` asks for `Neg Nat`
+
+In `-(ZPoly.eval ρ p) = -1 * 1 * ZPoly.eval ρ p` the subterm `-1 * 1` has only
+numerals, gets the default type `Nat`, and fails ("failed to synthesize an instance of
+Neg Nat"); `-1 * x` is fine. Here: `(-1 : Int) * 1 * …` (the reifier looks through
+ascriptions).
