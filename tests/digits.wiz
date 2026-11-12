@@ -1,0 +1,6 @@
+-- test: run
+import IO
+import Reals.Sqrt2
+-- √2 to 30 places, compiled through C (the program's `d` is the kernel's `Sqrt2.d`)
+def main : IO Unit :=
+  IO.println (String.append "1." (Syntax.decimal (Sqrt2.d (Nat.pow 10 30) - Nat.pow 10 30)))

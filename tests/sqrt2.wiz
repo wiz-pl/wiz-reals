@@ -1,0 +1,6 @@
+import Reals.Sqrt2
+-- The kernel computes the digits: √2 · 10^20, rounded down.
+def digits20 : Sqrt2.d (Nat.pow 10 20) = 141421356237309504880 := rfl
+-- √2 · √2 = 2, and the error bound at 10^20
+#check R.sqrt2_sq
+#check Sqrt2.approx_sq (Nat.pow 10 20 - 1)

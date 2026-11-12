@@ -1,0 +1,2 @@
+tests/sqrt2.wiz:5:1: info: R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)
+tests/sqrt2.wiz:6:1: info: Sqrt2.approx_sq (Nat.pow 10 20 - 1) : Q.abs (Sqrt2.approx (100000000000000000000 - 1) * Sqrt2.approx (100000000000000000000 - 1) - OfNat.ofNat Q 2 (instOfNatQN 2)) ≤ Sqrt2.err (100000000000000000000 - 1)

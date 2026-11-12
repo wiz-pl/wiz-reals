@@ -4,3 +4,5 @@ import Grail
 -- `grail test`: the tests under tests/.
 def package : Package := Package.new "wiz-reals"
   |> Package.lib "reals" "src"
+  |> Package.exe "sqrt2" "app/sqrt2.wiz"
+  |> Package.tests "tests" "tests"

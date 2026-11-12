@@ -1,0 +1,21 @@
+import IO
+import Reals.Sqrt2
+-- `.grail/bin/sqrt2`: √2 to 60 decimal places, from the same `Sqrt2.d` the proofs are
+-- about. `Sqrt2.approx_sq` says that `q = d/10^k` satisfies `|q² - 2| ≤ 4/10^k`; the
+-- program also checks `d² ≤ 2·10^(2k) < (d+1)²` on the numbers it prints.
+
+def k : Nat := 60
+def P : Nat := Nat.pow 10 k
+def d : Nat := Sqrt2.d P
+-- the theorem, at these numbers (`P = 10^60 = (10^60 - 1) + 1`)
+def certified : Q.abs (Sqrt2.approx (P - 1) * Sqrt2.approx (P - 1) - 2) ≤ Sqrt2.err (P - 1) := Sqrt2.approx_sq (P - 1)
+
+def Bool.toString : Bool → String
+  | .true => "true"
+  | .false => "false"
+-- (`Syntax.decimal`, not `Nat.toString`: that one stops at 2^64; FINDINGS.md, B3)
+def main : IO Unit := do
+  IO.println (String.append "sqrt 2 = 1." (Syntax.decimal (d - P)));
+  IO.println (String.append "d^2 <= 2*10^120 < (d+1)^2: "
+    (Bool.toString (Bool.and (Nat.le (d * d) (2 * (P * P))) (Nat.lt (2 * (P * P)) ((d + 1) * (d + 1))))));
+  IO.println "proved (Sqrt2.approx_sq): |q^2 - 2| <= 4/10^60 for q = d/10^60"
