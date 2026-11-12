@@ -1,0 +1,61 @@
+import Reals.RealMul
+-- Order on the reals. Positivity is *data*: a witness `n` with `1/(n+1) < xₙ` (a Σ in
+-- `Type`), because an `∃` in `Prop` can't be eliminated into the index a computation
+-- needs (DESIGN.md). `NonNeg` is a proposition: `-1/(n+1) ≤ xₙ` for every `n`.
+
+def R.Pos (x : R) : Type := (n : Nat) × (Q.invS n < x.seq n)
+def R.NonNeg (x : R) : Prop := (n : Nat) → -(Q.invS n) ≤ x.seq n
+def R.Lt (x y : R) : Type := R.Pos (y - x)
+def R.Le (x y : R) : Prop := R.NonNeg (y - x)
+
+-- `a - b ≤ S` gives `a - S ≤ b`
+def Q.sub_le_of_sub_le {ω a b S : Q} (h : a - b ≤ S) : a - S ≤ b :=
+  Q.le_iff_mpr (Q.NonNeg.congr (q_ring! S - (a - b) ≈ b - (a - S)) (Q.le_iff_mp h))
+-- `xₘ ≥ xₙ - (1/(n+1) + 1/(m+1))`
+def R.lower (x : R) (n m : Nat) : x.seq n - (Q.invS n + Q.invS m) ≤ x.seq m :=
+  Q.sub_le_of_sub_le (Q.le_trans (Q.le_abs (x.seq n - x.seq m)) (x.reg n m))
+
+-- a positive real is non-negative
+def R.nonneg_of_pos (x : R) (p : R.Pos x) : R.NonNeg x := fun m =>
+  let S := Q.invS p.1 + Q.invS m;
+  Q.chain _ (x.seq p.1 - S) _
+    (Q.chain _ (Q.invS p.1 - S) _
+      (Q.le_of_eq (q_ring! -(Q.invS m) ≈ Q.invS p.1 - (Q.invS p.1 + Q.invS m)))
+      (Q.add_le_add_right (-S) (Q.le_of_lt p.2)))
+    (R.lower x p.1 m)
+
+-- ## Archimedes: every real is below a natural number
+
+def Q.sub_le_sub_left {ω x y : Q} (c : Q) (h : x ≤ y) : c - y ≤ c - x := Q.add_le_add_left c (Q.neg_le_neg h)
+def R.archimedean (x : R) : (n : Nat) × R.Lt x (R.ofQ (Q.ofNat n)) :=
+  let B := Q.ofNat (R.bnd x);
+  let N := R.bnd x + 2;
+  -- (N - x) at 0 is N - x₁ ≥ (B + 2) - B = 2 > 1
+  let h2 : 2 ≤ Q.ofNat N + -(x.seq 1) :=
+    Q.chain _ ((B + 2) - x.seq 1) _
+      (Q.chain _ ((B + 2) - B) _ (Q.le_of_eq (q_ring! 2 ≈ B + 2 - B))
+        (Q.sub_le_sub_left (B + 2) (Q.le_of_abs_le (R.abs_le_bnd x 1))))
+      (Q.le_of_eq (Q.sub_congr (Q.symm (Q.ofNat_add2 (R.bnd x))) (Q.refl (x.seq 1))));
+  let h1 : Q.invS 0 < 2 := rfl;
+  (N, (0, @Q.lt_of_lt_of_le (Q.invS 0) 2 (Q.ofNat N + -(x.seq 1)) h1 h2))
+
+-- ## Absolute value
+
+-- `p ≤ q + r` gives `p - r ≤ q`
+def Q.sub_le_of_sub_le' {ω p q r : Q} (h : p ≤ q + r) : p - r ≤ q :=
+  Q.le_iff_mpr (Q.NonNeg.congr (q_ring! q + r - p ≈ q - (p - r)) (Q.le_iff_mp h))
+
+def Q.abs_abs_sub (a b : Q) : Q.abs (Q.abs a - Q.abs b) ≤ Q.abs (a - b) :=
+  Q.abs_le
+    (Q.sub_le_of_sub_le' (Q.le_congr (Q.abs_congr (q_ring! a - b + b ≈ a)) (Q.refl _) (Q.abs_add (a - b) b)))
+    (Q.le_trans (Q.le_of_eq (q_ring! -(Q.abs a - Q.abs b) ≈ Q.abs b - Q.abs a))
+      (Q.le_trans (Q.sub_le_of_sub_le' (Q.le_congr (Q.abs_congr (q_ring! b - a + a ≈ b)) (Q.refl _) (Q.abs_add (b - a) a)))
+        (Q.le_of_eq (Q.abs_sub_comm b a))))
+
+def Q.neg_lt_zero {ω p : Q} (h : 0 < p) : -p < -0 :=
+  Q.lt_iff_mpr (Q.Pos.congr (q_ring! p - 0 ≈ -0 - -p) (Q.lt_iff_mp h))
+def R.abs (x : R) : R := R.mk (fun n => Q.abs (x.seq n)) (fun m n => Q.le_trans (Q.abs_abs_sub (x.seq m) (x.seq n)) (x.reg m n))
+def R.abs_nonneg (x : R) : R.NonNeg (R.abs x) := fun n =>
+  let h : -(Q.invS n) < 0 := Q.lt_congr (Q.refl (-(Q.invS n))) (q_ring! -(0 : Q) ≈ 0) (Q.neg_lt_zero (Q.invS_pos n));
+  Q.chain (-(Q.invS n)) 0 (Q.abs (x.seq n)) (Q.le_of_lt h) (Q.abs_nonneg (x.seq n))
+def R.abs_congr {ω x y : R} (h : x ≈ y) : R.abs x ≈ R.abs y := fun n => Q.le_trans (Q.abs_abs_sub (x.seq n) (y.seq n)) (h n)

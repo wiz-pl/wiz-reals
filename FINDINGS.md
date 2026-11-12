@@ -97,6 +97,20 @@ not at the use. Here: `{ω m n k : Nat}` on lemmas that use their implicits
 (src/Reals/Nat.wiz `Nat.add_right_cancel`, src/Reals/IntOrder.wiz `Int.NonNeg.congr`),
 and transport motives taken at quantity 0.
 
+### B3. `Nat.toString` fails on numbers of 2^64 and above
+
+`Nat` is arbitrary precision (GMP) in compiled code, but `Nat.toString` (lib/IO.wiz) is
+`extern "wiz_nat_show"`, which takes a `uint64_t`:
+
+```
+import IO
+def main : IO Unit := IO.println (Nat.toString (Nat.pow 10 30))
+-- the program failed (3): wiz: a number is too big for a C integer
+```
+
+The arithmetic itself is fine (`Nat.lt (10^30) (10^31)` and `Nat.isqrt` on 121-digit
+numbers run). Here: `Syntax.decimal` from the Prelude (app/sqrt2.wiz).
+
 ## Papercuts
 
 ### P1. Equations that have computed defeat `Eq.trans`
@@ -141,6 +155,42 @@ are solvable from its arguments, but `.1` is elaborated first. Here:
 Only one of the 30 newest master commits (183f823) had a release snapshot on
 2026-11-12, so `wiz-toolchain` can't name the newest master (9596a24): tower fails
 with a 404 and lists the retained snapshots. This project pins 183f823.
+
+### P8. `|>` only pipes data
+
+`pipe {A B : Type}`, so `h |> fun h => …` with `h` a proof fails with "universe level
+mismatch: 1 vs 0". Proof terms are written inside out.
+
+### P9. A failing module's errors are repeated inside every importer's error
+
+When src/Reals/Ring.wiz had one error, checking src/Reals/QLaws.wiz (six imports
+further) printed one line per importer, each containing the whole nested list of
+the errors below it: several kilobytes of `module Reals.X has errors: [module
+Reals.Y has errors: [...]]` and the 'no field' cascades of P2, for one typo.
+
+### P10. Equations that compute meet class methods
+
+`Q.ofNat (k + 2) ≈ Q.ofNat k + 2` unfolds (through `Equiv.equiv`, `Q.Eq`, `Int.mul` of
+`Int.ofNat`s) to an equation of `Int.ofNat`s, which computes to a Σ whose first field
+is an equation of naturals. Neither `nat_ring!` (an equation of naturals) nor
+`congrArg Int.ofNat (nat_ring! …)` is accepted for it ("spine length mismatch": the
+unifier compares the class method's application with the Σ instead of unfolding it).
+`int_ring!` fails too, with "expected ?m30 p, inferred Int". What works: a separate
+lemma whose type is the integer equation written out, proved by
+`congrArg Int.ofNat (nat_ring! …)`, then used at `≈` (src/Reals/Real.wiz
+`Q.ofNat_add2'`, src/Reals/Sqrt2.wiz `Sqrt2.err_eq'`).
+
+### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)`
+
+`#check R.sqrt2_sq` prints `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`; at
+`Nat` and `Int` numerals print as numerals. (tests/sqrt2.expected)
+
+### P12. Partially applied recursive calls
+
+In a definition by equations with a parameter before the colon,
+`Isqrt.step … (Isqrt.go n f) …` (the recursive function applied to the parameter and
+the structural argument only) is rejected: "recursive call of Isqrt.go on n, which is
+not a recursive field". Eta-expanding, `(fun a b => Isqrt.go n f a b)`, works.
 
 ## Slowness
 
@@ -235,3 +285,35 @@ arguments twice, in the numerator and the denominator) into ever larger integer
 terms instead of failing at the first rigid mismatch. In practice this means a
 typo costs a three-minute wait and no error message; the workaround is to bisect by
 hand (a script that checks growing prefixes of the file with a 60 s limit).
+
+### S5. Unfolding a recursive definition against its own body: over a minute
+
+`Isqrt.go n (succ f) lo hi` unfolds to a `Isqrt.stop …` term with a lambda that
+contains the recursive call. Proving a lemma about it by giving the lemma about that
+`stop` term (`Isqrt.stop_spec … rfl`) did not finish in 60 s. Moving the body into a
+definition of its own, `Isqrt.body n g lo hi` with the recursive call as the argument
+`g`, made the same proof check in under a second (src/Reals/Isqrt.wiz).
+
+## How long things take
+
+On this machine, under `light`/`heavy` (approximate): every module checks in 1–16 s
+once written correctly; `grail build` from scratch about 95 s, most of it the
+reflective `rfl`s of `q_ring!` in src/Reals/QLaws.wiz and the reals. A single
+`q_ring!` identity with four atoms takes about 1 s (S3 explains why not 20 s).
+The cost of writing is dominated by S4: a wrong step is a timeout, not an error.
+
+## What is missing
+
+* **The inverse of a real apart from zero** (Bishop's `x⁻¹` with `x_{N²(n+1)}`) and the
+  field law `x · x⁻¹ ≈ 1`. All the pieces exist (positivity as data, `Q.inv`, the
+  equality criterion); it is the same kind of index bookkeeping as `R.mul_assoc`.
+* **The intermediate value theorem** (approximate form). Continuity is stated
+  (`R.add_dist`, `R.mul_dist`) but not for general functions.
+* **The order on reals beyond the basics**: positivity, non-negativity, `R.archimedean`
+  and `|x|` are there; transitivity of `<` and compatibility with `+` and `·` are not.
+
+## Not written in Wiz
+
+Nothing in the package. While developing, a small Python script checked growing
+prefixes of a file with a time limit, to find the definition that made the checker
+hang (S4, S5).
