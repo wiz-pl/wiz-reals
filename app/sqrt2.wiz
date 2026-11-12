@@ -13,9 +13,8 @@ def certified : Q.abs (Sqrt2.approx (P - 1) * Sqrt2.approx (P - 1) - 2) ≤ Sqrt
 def Bool.toString : Bool → String
   | .true => "true"
   | .false => "false"
--- (`Syntax.decimal`, not `Nat.toString`: that one stops at 2^64; FINDINGS.md, B3)
 def main : IO Unit := do
-  IO.println (String.append "sqrt 2 = 1." (Syntax.decimal (d - P)));
+  IO.println (String.append "sqrt 2 = 1." (Nat.toString (d - P)));
   IO.println (String.append "d^2 <= 2*10^120 < (d+1)^2: "
     (Bool.toString (Bool.and (Nat.le (d * d) (2 * (P * P))) (Nat.lt (2 * (P * P)) ((d + 1) * (d + 1))))));
   IO.println "proved (Sqrt2.approx_sq): |q^2 - 2| <= 4/10^60 for q = d/10^60"
