@@ -37,7 +37,7 @@ def R.archimedean (x : R) : (n : Nat) × R.Lt x (R.ofQ (Q.ofNat n)) :=
         (Q.sub_le_sub_left (B + 2) (Q.le_of_abs_le (R.abs_le_bnd x 1))))
       (Q.le_of_eq (Q.sub_congr (Q.symm (Q.ofNat_add2 (R.bnd x))) (Q.refl (x.seq 1))));
   let h1 : Q.invS 0 < 2 := rfl;
-  (N, (0, @Q.lt_of_lt_of_le (Q.invS 0) 2 (Q.ofNat N + -(x.seq 1)) h1 h2))
+  (N, (0, Q.lt_of_lt_of_le h1 h2))
 
 -- ## Absolute value
 

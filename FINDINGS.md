@@ -12,9 +12,32 @@ and what this project does instead. Severity:
 * **slow**: correct but slow (timings are wall-clock under `light` on a shared
   machine: approximate, not measurements).
 
+## Status (2026-11-12)
+
+Fixed in wiz PRs that are not merged yet. Branch `cleanup` of this repository uses them
+(a local toolchain: master + #230 + #239 + #221 + #227) and drops the workarounds:
+
+* **G2** (no arithmetic library): lib/Nat, Order, Ring (`nat_ring!`), Int, IntRing
+  (`Int.ofPair`, `int_ring!`, `int_pair_ring!`), IntOrder and Rat (`Q`, its laws,
+  `q_ring!`) are this project's modules, upstreamed in #221. On `cleanup`, src/Reals/{Nat,Order,Ring,Int,IntRing,ZRing,IntOrder,Rat,QRing,
+  QLaws}.wiz are gone and the rest imports lib (`Nat.le_zero` is `Nat.zero_le`,
+  `Nat.sub_add_of_le` is `Nat.add_sub_of_le`).
+* **B1** (recursive calls don't insert implicits), **B3** (`Nat.toString` ≥ 2^64; app/sqrt2.wiz
+  prints with it again), **P6** (two `let`s on a line), **P8** (`|>` on proofs), **P9**
+  (errors repeated in every importer), **P12** (partially applied recursive calls):
+  fixed in #239.
+* **G1** (tactics can't read an equation): fixed by `TacticM.eqView` (#197); `by ring`
+  (#227) is the normalisers as a tactic that reads the goal.
+* **S1, S3, S4** (slow failures, slow ascribed proofs): fixed in #230 (one unfolding
+  order per glued layer). S4's wrong proof is rejected in about 5 s with the type error.
+* Not fixed: **B2** (proofs count usage; wiz agent prf-conv-2), **P1** (computed
+  equations vs `Eq.trans`: glued equations, #155; the `@Eq.trans Int x y z` stay),
+  **P7** (#214), **S2** (glued equations), **S5** (not reproduced with a reconstruction
+  of the old Isqrt), P2–P5, P10, P11.
+
 ## Gaps
 
-### G1. Tactics can't read an equation
+### G1. Tactics can't read an equation (fixed in wiz #197, #227)
 
 `TacticM.goalType` reflects `a = b` as `Expr.opaque _` (the reflected `Expr` has no
 constructor for the kernel's equality; Prelude: "Kernel forms with no constructor here
@@ -48,7 +71,7 @@ statement, once in the proof), and atoms are compared syntactically (`f x` and
 `f (x)` are two atoms).
 Wanted: `Expr.eq A a b` in the reflected terms (and in `Expr.view`).
 
-### G2. No arithmetic library: everything from `0` and `succ`
+### G2. No arithmetic library: everything from `0` and `succ` (upstreamed in wiz #221, #227)
 
 lib/ has `Int` with five lemmas, no `Rat`, no order on `Nat` or `Int` as a
 proposition, no `≤`/`<` notation, and no `ring`/`omega`/`linarith`/`simp`. Before the
@@ -61,7 +84,7 @@ on top of the one for `Nat` (src/Reals/IntRing.wiz) and the order of `Int`
 
 ## Bugs
 
-### B1. A recursive call in an equation definition doesn't insert implicit arguments
+### B1. A recursive call in an equation definition doesn't insert implicit arguments (fixed in wiz #239)
 
 ```
 import Logic
@@ -97,7 +120,7 @@ not at the use. Here: `{ω m n k : Nat}` on lemmas that use their implicits
 (src/Reals/Nat.wiz `Nat.add_right_cancel`, src/Reals/IntOrder.wiz `Int.NonNeg.congr`),
 and transport motives taken at quantity 0.
 
-### B3. `Nat.toString` fails on numbers of 2^64 and above
+### B3. `Nat.toString` fails on numbers of 2^64 and above (fixed in wiz #239)
 
 `Nat` is arbitrary precision (GMP) in compiled code, but `Nat.toString` (lib/IO.wiz) is
 `extern "wiz_nat_show"`, which takes a `uint64_t`:
@@ -156,12 +179,12 @@ Only one of the 30 newest master commits (183f823) had a release snapshot on
 2026-11-12, so `wiz-toolchain` can't name the newest master (9596a24): tower fails
 with a 404 and lists the retained snapshots. This project pins 183f823.
 
-### P8. `|>` only pipes data
+### P8. `|>` only pipes data (fixed in wiz #239)
 
 `pipe {A B : Type}`, so `h |> fun h => …` with `h` a proof fails with "universe level
 mismatch: 1 vs 0". Proof terms are written inside out.
 
-### P9. A failing module's errors are repeated inside every importer's error
+### P9. A failing module's errors are repeated inside every importer's error (fixed in wiz #239)
 
 When src/Reals/Ring.wiz had one error, checking src/Reals/QLaws.wiz (six imports
 further) printed one line per importer, each containing the whole nested list of
@@ -185,7 +208,7 @@ lemma whose type is the integer equation written out, proved by
 `#check R.sqrt2_sq` prints `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`; at
 `Nat` and `Int` numerals print as numerals. (tests/sqrt2.expected)
 
-### P12. Partially applied recursive calls
+### P12. Partially applied recursive calls (fixed in wiz #239)
 
 In a definition by equations with a parameter before the colon,
 `Isqrt.step … (Isqrt.go n f) …` (the recursive function applied to the parameter and
@@ -194,7 +217,7 @@ not a recursive field". Eta-expanding, `(fun a b => Isqrt.go n f a b)`, works.
 
 ## Slowness
 
-### S1. A unification failure under a binder takes 17–80 s
+### S1. A unification failure under a binder takes 17–80 s (fixed in wiz #230)
 
 ```
 import Reals.Int
@@ -235,7 +258,7 @@ the reflective provers first compared normal forms (`rfl : norm a = norm b`): an
 identity with 36 monomials ran out of memory. Here: `Poly.beq`/`ZPoly.beq` and a
 soundness lemma (`Poly.beq_eval`), in src/Reals/Ring.wiz and src/Reals/ZRing.wiz.
 
-### S3. The same proof is 8× slower under an ascription
+### S3. The same proof is 8× slower under an ascription (fixed in wiz #230)
 
 ```
 import Reals.QRing
@@ -256,7 +279,7 @@ unifier unfolds the evaluator very inefficiently, while the kernel (which checks
 versions) is fast. Here: the macros emit the bare proof, so they are only used where
 the equation is the expected type (src/Reals/Ring.wiz, `Reify.expandWith`).
 
-### P6. `let a := …; let b := …;` on one line ends the term
+### P6. `let a := …; let b := …;` on one line ends the term (fixed in wiz #239)
 
 ```
   let ha := QE.sound ρ a; let hb := QE.sound ρ b;
@@ -273,7 +296,7 @@ numerals, gets the default type `Nat`, and fails ("failed to synthesize an insta
 Neg Nat"); `-1 * x` is fine. Here: `(-1 : Int) * 1 * …` (the reifier looks through
 ascriptions).
 
-### S4. A wrong proof in a chain of inequalities takes minutes to be rejected
+### S4. A wrong proof in a chain of inequalities takes minutes to be rejected (fixed in wiz #230)
 
 In `R.add_assoc` (src/Reals/Real.wiz), a congruence was used in the wrong direction:
 `Q.le_congr (Q.abs_congr e) (Q.refl _) h` where `Q.le_congr` wanted `Q.symm (…)`. The

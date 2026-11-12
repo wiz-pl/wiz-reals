@@ -34,10 +34,10 @@ def R.eq_of_bound (x y : R) (k : Nat)
     let D := Q.invS n + Q.invS n + Q.ofNat (k + 2) * Q.invS m;
     let eCD' : C ≈ D' := q_ring! Q.invS n + Q.invS m + (Q.ofNat k * Q.invS m + (Q.invS m + Q.invS n)) ≈ Q.invS n + Q.invS n + (Q.ofNat k + 2) * Q.invS m;
     let eD'D : D' ≈ D := Q.add_congr (Q.refl (Q.invS n + Q.invS n)) (Q.mul_congr (Q.symm (Q.ofNat_add2 k)) (Q.refl (Q.invS m)));
-    @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
-      (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
+    Q.le_trans (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
+      (Q.le_trans (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
 
--- chains with every term written out (inferring them is very slow: FINDINGS.md, S4)
+-- chains with the middle term written out
 def Q.chain (a b c : Q) (h1 : a ≤ b) (h2 : b ≤ c) : a ≤ c := Q.le_trans h1 h2
 def Q.chainEq (a b c : Q) (h1 : a ≤ b) (e : b ≈ c) : a ≤ c := Q.le_trans h1 (Q.le_of_eq e)
 def Q.abs_sub_add (a b c d : Q) : Q.abs ((a + b) - (c + d)) ≤ Q.abs (a - c) + Q.abs (b - d) :=

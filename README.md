@@ -13,12 +13,7 @@ reals are Bishop's regular sequences and how the algebra is automated.
 
 | module | contents |
 |---|---|
-| `Reals.Nat` | the commutative semiring laws of `Nat`, its order (`Nat.Le` from the Prelude's Boolean `Nat.le`) |
-| `Reals.Ring` | `nat_ring!`: a reflective normaliser for commutative semirings, with its soundness proof |
-| `Reals.Int`, `Reals.IntRing` | the ring laws of `Int` through pairs of naturals; `int_pair_ring!` |
-| `Reals.ZRing` | `int_ring!`: normalisation with integer coefficients |
-| `Reals.IntOrder` | the order of `Int`, `Int.abs` |
-| `Reals.Rat`, `Reals.QRing`, `Reals.QLaws` | `Q` (unreduced fractions, a setoid), `q_ring!`; ordered field: ring laws, congruences, order, `abs`, triangle inequality, inverse (`p * Q.inv p ≈ 1`), the archimedean property |
+| (lib, wiz #221) | `Nat`, `Order`, `Ring` (`nat_ring!`), `Int`, `IntRing` (`int_pair_ring!`, `int_ring!`), `IntOrder`, `Rat` (`Q`, unreduced fractions, a setoid; `q_ring!`; the ordered field), `RingTactic` (`by ring`, #227): these were this project's modules and are in Wiz's library now (branch `cleanup`) |
 | `Reals.QSeq` | `1/(n+1)`, and "below `b + k/(m+1)` for all `m` means below `b`" |
 | `Reals.Real` | `R` (regular sequences), `≈` (an equivalence, by Bishop's criterion `R.eq_of_bound`), `+`, `-`, the additive group laws |
 | `Reals.RealMul` | `·` (Bishop's, through a bound of the factors), commutativity, associativity, `1`, distributivity, congruence |

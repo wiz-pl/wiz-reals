@@ -9,7 +9,7 @@ def Q.invS_nonneg (n : Nat) : 0 ≤ Q.invS n := Q.le_of_lt (Q.invS_pos n)
 def Int.ofNat_le (m n : Nat) (h : Nat.Le m n) : Int.Le (Int.ofNat m) (Int.ofNat n) :=
   Int.NonNeg.congr
     (Eq.symm (Eq.trans (congrArg2 (fun x y => x - y) (Int.ofNat_pair n) (Int.ofNat_pair m)) (Int.ofPair_sub n 0 m 0)))
-    (Int.ofPair_nonneg (n + 0) (0 + m) (Eq.mpr' (fun (z : Nat) => Nat.Le m z) (Nat.add_zero n) h))
+    (Int.ofPair_nonneg (n + 0) (0 + m) (Eq.mpr' (fun z => Nat.Le m z) (Nat.add_zero n) h))
 -- `1/(n+1) ≤ 1/(m+1)` when `m ≤ n`
 def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
   Int.Le.congr (int_ring! Int.ofNat (Nat.succ m) = 1 * Int.ofNat (Nat.succ m)) (int_ring! Int.ofNat (Nat.succ n) = 1 * Int.ofNat (Nat.succ n))
@@ -37,7 +37,7 @@ def Q.small (d : Q) (hd : Q.Pos d) (k : Nat) : Q.ofNat k * Q.invS (k * Int.natAb
       (Int.nonneg_add _ 1 (Int.nonneg_mul _ _ rfl (Int.nonneg_of_pos d.den d.pos)) rfl))
 
 def Q.le_of_forall_le_add (a b : Q) (k : Nat) (h : (m : Nat) → a ≤ b + Q.ofNat k * Q.invS m) : a ≤ b :=
-  Or.elim (Q.le_or_lt a b) (fun h' => h') (fun (hlt : b < a) =>
+  Or.elim (Q.le_or_lt a b) (fun h' => h') (fun hlt =>
     let d := a - b;
     let hd : Q.Pos d := Q.lt_iff_mp hlt;
     let m := k * Int.natAbs d.den;

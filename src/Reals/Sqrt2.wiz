@@ -6,9 +6,9 @@ import Reals.Isqrt
 
 def Nat.lt_of_mul_self_lt (p q : Nat) (h : Nat.Lt (p * p) (q * q)) : Nat.Lt p q :=
   Or.elim (Bool.cases (Nat.le q p))
-    (fun (hle : Nat.le q p = .true) =>
+    (fun hle =>
       absurd (Nat.lt_irrefl (p * p) (Nat.lt_of_lt_of_le (p * p) (q * q) (p * p) h (Nat.mul_le_mul q p q p hle hle))))
-    (fun (hf : Nat.le q p = .false) => Nat.not_le q p hf)
+    (fun hf => Nat.not_le q p hf)
 
 -- ## The approximation `d/P` with `d = isqrt (2P²)`
 
@@ -24,7 +24,7 @@ def Sqrt2.d_lt (p : Nat) : Nat.Lt (Sqrt2.d (Nat.succ p)) (2 * Nat.succ p) :=
   let P := Nat.succ p;
   Nat.lt_of_mul_self_lt (Sqrt2.d P) (2 * P)
     (Nat.lt_of_le_of_lt (Sqrt2.d P * Sqrt2.d P) (2 * (P * P)) (2 * P * (2 * P)) (Sqrt2.lo P)
-      (Eq.mp' (fun (z : Nat) => Nat.Lt (2 * (P * P)) z) (nat_ring! Nat.succ (2 * (Nat.succ p * Nat.succ p)) + (2 * (p * Nat.succ p) + 2 * p + 1) = 2 * Nat.succ p * (2 * Nat.succ p))
+      (Eq.mp' (fun z => Nat.Lt (2 * (P * P)) z) (nat_ring! Nat.succ (2 * (Nat.succ p * Nat.succ p)) + (2 * (p * Nat.succ p) + 2 * p + 1) = 2 * Nat.succ p * (2 * Nat.succ p))
         (Nat.le_add_right (Nat.succ (2 * (P * P))) (2 * (p * P) + 2 * p + 1))))
 
 def Sqrt2.approx (p : Nat) : Q :=
@@ -59,7 +59,7 @@ def Sqrt2.approx_sq (p : Nat) : Q.abs (Sqrt2.approx p * Sqrt2.approx p - 2) ≤ 
 def Nat.mul_lt_mul_right_succ (a b c' : Nat) (h : Nat.Lt a b) : Nat.Lt (a * Nat.succ c') (b * Nat.succ c') :=
   -- a(c'+1) < (a+1)(c'+1) ≤ b(c'+1)
   Nat.lt_of_lt_of_le (a * Nat.succ c') (Nat.succ a * Nat.succ c') (b * Nat.succ c')
-    (Eq.mp' (fun (z : Nat) => Nat.Lt (a * Nat.succ c') z) (nat_ring! Nat.succ (a * Nat.succ c') + c' = Nat.succ a * Nat.succ c')
+    (Eq.mp' (fun z => Nat.Lt (a * Nat.succ c') z) (nat_ring! Nat.succ (a * Nat.succ c') + c' = Nat.succ a * Nat.succ c')
       (Nat.le_add_right (Nat.succ (a * Nat.succ c')) c'))
     (Nat.mul_le_mul_right (Nat.succ c') (Nat.succ a) b h)
 
@@ -75,7 +75,7 @@ def Sqrt2.cross (m n : Nat) :
       (Eq.mp' (fun (z : Nat) => Nat.Le z (2 * (M * M) * (N * N))) (nat_ring! a * a * (N * N) = a * N * (a * N))
         (Nat.mul_le_mul_right (N * N) (a * a) (2 * (M * M)) (Sqrt2.lo M)))
       (Eq.mp' (fun (z : Nat) => Nat.Lt z (b * M * (b * M))) (nat_ring! 2 * (N * N) * (M * M) = 2 * (M * M) * (N * N))
-        (Eq.mp' (fun (z : Nat) => Nat.Lt (2 * (N * N) * (M * M)) z) (nat_ring! b * b * (M * M) = b * M * (b * M))
+        (Eq.mp' (fun z => Nat.Lt (2 * (N * N) * (M * M)) z) (nat_ring! b * b * (M * M) = b * M * (b * M))
           (Nat.mul_lt_mul_right_succ (2 * (N * N)) (b * b) (m + m * Nat.succ m) (Sqrt2.hi N)))))
 
 def Sqrt2.diff_le (m n : Nat) : Sqrt2.approx m - Sqrt2.approx n ≤ Q.invS n :=

@@ -79,7 +79,7 @@ def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
 def Isqrt.go_spec (n : Nat) : (f lo hi : Nat) → Isqrt.Inv n f lo hi → Isqrt.Spec n (Isqrt.go n f lo hi)
   | .zero, lo, hi, inv =>
     let e : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1
-      (Eq.mp' (fun (z : Nat) => Nat.Le hi z) (nat_ring! lo + 0 + 1 = Nat.succ lo) inv.2.2.2);
+      (Eq.mp' (fun z => Nat.Le hi z) (nat_ring! lo + 0 + 1 = Nat.succ lo) inv.2.2.2);
     (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e inv.2.1)
   | .succ f, lo, hi, inv =>
     let g := fun a b => Isqrt.go n f a b;

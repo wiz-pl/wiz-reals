@@ -18,8 +18,8 @@ def R.dist_of_bound (x y : R) (e : Q) (K : Nat)
     let D := e + (Q.invS n + Q.invS n) + Q.ofNat (K + 2) * Q.invS m;
     let eCD' : C ≈ D' := q_ring! Q.invS n + Q.invS m + ((e + Q.ofNat K * Q.invS m) + (Q.invS m + Q.invS n)) ≈ e + (Q.invS n + Q.invS n) + (Q.ofNat K + 2) * Q.invS m;
     let eD'D : D' ≈ D := Q.add_congr (Q.refl _) (Q.mul_congr (Q.symm (Q.ofNat_add2 K)) (Q.refl (Q.invS m)));
-    @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
-      (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
+    Q.le_trans (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
+      (Q.le_trans (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))
 
 def R.dist_of_eq {ω x y : R} (h : x ≈ y) : R.Dist x y 0 :=
   fun k => Q.le_trans (h k) (Q.le_of_eq (q_ring! Q.invS k + Q.invS k ≈ 0 + (Q.invS k + Q.invS k)))

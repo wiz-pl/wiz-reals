@@ -64,16 +64,20 @@ in practice because the reals only ever multiply two terms of their sequences, a
 
 ## Automation: three reflective normalisers
 
+(Since wiz #221 these live in Wiz's library: lib/Ring.wiz, lib/IntRing.wiz, lib/Rat.wiz;
+`by ring`, wiz #227, runs them on the goal. The file names below are those of
+lib/.)
+
 All the algebra is done by **proof by reflection**:
 
-* `nat_ring!` (src/Reals/Ring.wiz): commutative semirings at `Nat`. Expressions over
+* `nat_ring!` (lib/Ring.wiz): commutative semirings at `Nat`. Expressions over
   atoms are normalised into sorted lists of monomials; soundness is proved once.
-* `int_ring!` (src/Reals/ZRing.wiz): commutative rings at `Int`, with integer
+* `int_ring!` (lib/IntRing.wiz): commutative rings at `Int`, with integer
   coefficients. Its soundness needs the ring laws of `Int`, which are proved through
-  the pair representation (`Int.ofPair a b = a - b`, src/Reals/Int.wiz) by a slower
-  bootstrap normaliser, `int_pair_ring!` (src/Reals/IntRing.wiz), on top of
+  the pair representation (`Int.ofPair a b = a - b`, lib/IntRing.wiz) by a slower
+  bootstrap normaliser, `int_pair_ring!` (lib/IntRing.wiz), on top of
   `nat_ring!`.
-* `q_ring!` (src/Reals/QRing.wiz): identities of rationals that hold in every
+* `q_ring!` (lib/Rat.wiz): identities of rationals that hold in every
   commutative ring, up to `≈`. A rational expression has a numerator and a denominator
   that are integer expressions in its atoms' numerators and denominators; `lhs ≈ rhs`
   is one integer identity.
