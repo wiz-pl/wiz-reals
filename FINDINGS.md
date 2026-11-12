@@ -168,6 +168,21 @@ Type` (the name falls back to field access on the type `Nat`).
 `Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "unification problem is outside the
 pattern fragment"; `fun (x : Nat) => …` works.
 
+Still open with wiz #239 (2026-11-12), now with a different message:
+
+```
+import Nat
+def t (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
+  Eq.mp' (fun x => Nat.Le x (b + k)) e h
+-- error: type mismatch  expected: ?m9 a b k e h a  inferred: Nat.Le a (b + k)
+--   (a variable escapes the scope of the hole being solved)
+```
+
+The lambda is elaborated before `A` is known (its binder's type is a hole), so its body
+`Nat.Le x (b + k)` is the hole `?P x`; `h`'s type then meets `?P a` with `a` also in the
+hole's context. Where the expected type fixes `A` first, the annotation is no longer
+needed (cleanup branch: several `fun (z : Nat) =>` became `fun z =>`).
+
 ### P4. Projections of an unsolved equation
 
 `absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1` reports
