@@ -98,6 +98,12 @@ def QE.prove (ρ : List Q) (a b : QE)
     (Eq.trans (IE.prove (QE.env ρ) (.mul (QE.toIE a).1 (QE.toIE b).2) (.mul (QE.toIE b).1 (QE.toIE a).2) (Bool.and_right _ _ h))
       (Eq.symm (congrArg2 (fun x y => x * y) hb.1 ha.2)))
 
+def QE.proveAt (x y : Q) (ρ : List Q) (a b : QE) (hx : QE.eval ρ a = x) (hy : QE.eval ρ b = y)
+    (h : Bool.and (Bool.and (QE.wf (List.length ρ) a) (QE.wf (List.length ρ) b))
+           (ZPoly.beq (IE.norm (.mul (QE.toIE a).1 (QE.toIE b).2)) (IE.norm (.mul (QE.toIE b).1 (QE.toIE a).2))) = .true) :
+    x ≈ y :=
+  @Eq.mp' Q (QE.eval ρ b) y (fun z => x ≈ z) hy (@Eq.mp' Q (QE.eval ρ a) x (fun z => z ≈ QE.eval ρ b) hx (QE.prove ρ a b h))
+
 def QRing.expand : Macro := fun stx => Reify.expand "QE" stx
 syntax:lead (name := qRing) "q_ring!" term : term
 attribute [macro term.qRing] QRing.expand

@@ -262,6 +262,10 @@ partial def Syn.beq : {ω b c : Bool} → SyntaxF b → SyntaxF c → Bool
   | _, _, _, _ => .false
 
 -- the index of `x` in the atoms, or their number if it isn't there
+def NE.proveAt (x y : Nat) (ρ : List Nat) (a b : NE) (hx : NE.eval ρ a = x) (hy : NE.eval ρ b = y)
+    (h : Poly.beq (NE.norm a) (NE.norm b) = .true) : x = y :=
+  Eq.trans (Eq.symm hx) (Eq.trans (NE.prove ρ a b h) hy)
+
 def Reify.find (x : Syntax) : List Syntax → Nat
   | .nil => 0
   | .cons y ys => if Syn.beq x y then 0 else Nat.succ (Reify.find x ys)
@@ -314,7 +318,7 @@ def Reify.list : List Syntax → Syntax
   | .nil => `(term| List.nil)
   | .cons x xs => let r := Reify.list xs; `(term| List.cons $x $r)
 
--- `P.prove ρ e₁ e₂ rfl`, a proof of `lhs = rhs` when that is the expected type
+-- a proof of `lhs = rhs` (or `lhs ≈ rhs`)
 def Reify.expandWith (pre : String) (prove : String) (stx : Syntax) : MacroM Syntax :=
   let eqn := Syntax.getArg stx 1;
   match eqn with
@@ -325,13 +329,18 @@ def Reify.expandWith (pre : String) (prove : String) (stx : Syntax) : MacroM Syn
       let ρ := Reify.list r.2;
       let el := l.1;
       let er := r.1;
-      let pr := Syntax.mkApp (Reify.ctor pre prove) (.cons ρ (.cons el (.cons er (.cons `(term| rfl) .nil))));
-      -- no ascription `($pr : $eqn)`: the proof is checked against the expected type,
-      -- which is much faster (FINDINGS.md, S3), so the equation must be the expected type
+      let lhs := SyntaxF.nth args 0;
+      let rhs := SyntaxF.nth args 2;
+      -- `P.proveAt lhs rhs ρ e₁ e₂ rfl rfl rfl`: its type is the equation as written, and
+      -- the two `rfl`s check that `e₁`, `e₂` evaluate to the sides. An ascription
+      -- `(P.prove ρ e₁ e₂ rfl : lhs = rhs)` says the same but is far slower to elaborate
+      -- (FINDINGS.md, S3).
+      let r3 : List Syntax := .cons `(term| rfl) (.cons `(term| rfl) (.cons `(term| rfl) .nil));
+      let pr := Syntax.mkApp (Reify.ctor pre prove) (.cons lhs (.cons rhs (.cons ρ (.cons el (.cons er r3)))));
       MacroM.pure pr
     else MacroM.throw "ring!: expected an equation `lhs = rhs`"
   | _ => MacroM.throw "ring!: expected an equation `lhs = rhs`"
-def Reify.expand (pre : String) (stx : Syntax) : MacroM Syntax := Reify.expandWith pre "prove" stx
+def Reify.expand (pre : String) (stx : Syntax) : MacroM Syntax := Reify.expandWith pre "proveAt" stx
 def NatRing.expand : Macro := fun stx => Reify.expand "NE" stx
 syntax:lead (name := natRing) "nat_ring!" term : term
 attribute [macro term.natRing] NatRing.expand

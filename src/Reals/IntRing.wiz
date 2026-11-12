@@ -75,6 +75,10 @@ def IE.provePairs (ρ : List Int) (a b : IE)
 
 -- (`int_pair_ring!` is the bootstrap: it proves the lemmas of Reals.ZRing, whose
 -- `int_ring!` normalises with integer coefficients and is much faster)
-def IntPairRing.expand : Macro := fun stx => Reify.expandWith "IE" "provePairs" stx
+def IE.provePairsAt (x y : Int) (ρ : List Int) (a b : IE) (hx : IE.eval ρ a = x) (hy : IE.eval ρ b = y)
+    (h : Poly.beq (NE.norm (.add (IE.toPair a).1 (IE.toPair b).2)) (NE.norm (.add (IE.toPair b).1 (IE.toPair a).2)) = .true) :
+    x = y :=
+  Eq.trans (Eq.symm hx) (Eq.trans (IE.provePairs ρ a b h) hy)
+def IntPairRing.expand : Macro := fun stx => Reify.expandWith "IE" "provePairsAt" stx
 syntax:lead (name := intPairRing) "int_pair_ring!" term : term
 attribute [macro term.intPairRing] IntPairRing.expand

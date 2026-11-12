@@ -112,8 +112,17 @@ def Int.ofNat_succ_pos (n : Nat) : Int.Lt 0 (Int.ofNat (Nat.succ n)) :=
 
 -- ## Absolute value
 
-def Int.abs (a : Int) : Int := Int.ofNat (Int.natAbs a)
-def Int.abs_nonneg (a : Int) : Int.NonNeg (Int.abs a) := rfl
+-- (by cases, not `Int.ofNat (Int.natAbs a)`: an equation `Int.abs a = Int.abs b` would
+-- compute to one of `natAbs`, which `Eq.trans` can't see through; FINDINGS.md, P1)
+def Int.abs : Int → Int
+  | .ofNat n => .ofNat n
+  | .negSucc n => .ofNat (.succ n)
+def Int.abs_nonneg : (a : Int) → Int.NonNeg (Int.abs a)
+  | .ofNat _ => rfl
+  | .negSucc _ => rfl
+def Int.ofNat_natAbs : (a : Int) → Int.ofNat (Int.natAbs a) = Int.abs a
+  | .ofNat _ => rfl
+  | .negSucc _ => rfl
 def Int.le_abs : (a : Int) → Int.Le a (Int.abs a)
   | .ofNat n => Int.le_refl (Int.ofNat n)
   | .negSucc _ => rfl
@@ -132,15 +141,20 @@ def Int.natAbs_mul : (a b : Int) → Int.natAbs (a * b) = Int.natAbs a * Int.nat
   | .ofNat m, .negSucc n => Int.natAbs_negOfNat (m * Nat.succ n)
   | .negSucc m, .ofNat n => Int.natAbs_negOfNat (Nat.succ m * n)
   | .negSucc _, .negSucc _ => rfl
-def Int.abs_mul (a b : Int) : Int.abs (a * b) = Int.abs a * Int.abs b :=
-  congrArg Int.ofNat (Int.natAbs_mul a b)
+def Int.abs_negOfNat : (k : Nat) → Int.abs (Int.negOfNat k) = Int.ofNat k
+  | .zero => rfl
+  | .succ _ => rfl
+def Int.abs_mul : (a b : Int) → Int.abs (a * b) = Int.abs a * Int.abs b
+  | .ofNat _, .ofNat _ => rfl
+  | .ofNat m, .negSucc n => Int.abs_negOfNat (m * Nat.succ n)
+  | .negSucc m, .ofNat n => Int.abs_negOfNat (Nat.succ m * n)
+  | .negSucc _, .negSucc _ => rfl
 def Int.abs_neg : (a : Int) → Int.abs (-a) = Int.abs a
   | .ofNat .zero => rfl
   | .ofNat (.succ _) => rfl
   | .negSucc _ => rfl
 def Int.abs_sub_comm (a b : Int) : Int.abs (a - b) = Int.abs (b - a) :=
-  @Eq.trans Int (Int.abs (a - b)) (Int.abs (-(b - a))) (Int.abs (b - a))
-    (congrArg Int.abs (int_ring! a - b = -(b - a))) (Int.abs_neg (b - a))
+  Eq.trans (congrArg Int.abs (int_ring! a - b = -(b - a))) (Int.abs_neg (b - a))
 def Int.abs_add (a b : Int) : Int.Le (Int.abs (a + b)) (Int.abs a + Int.abs b) :=
   Int.abs_le (a + b) (Int.abs a + Int.abs b)
     (Int.add_le_add a (Int.abs a) b (Int.abs b) (Int.le_abs a) (Int.le_abs b))

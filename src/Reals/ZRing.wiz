@@ -152,6 +152,10 @@ def ZPoly.beq_eval (ρ : List Int) : (p q : ZPoly) → ZPoly.beq p q = .true →
 def IE.prove (ρ : List Int) (a b : IE) (h : ZPoly.beq (IE.norm a) (IE.norm b) = .true) : IE.eval ρ a = IE.eval ρ b :=
   Eq.trans (Eq.symm (IE.eval_norm ρ a)) (Eq.trans (ZPoly.beq_eval ρ (IE.norm a) (IE.norm b) h) (IE.eval_norm ρ b))
 
+def IE.proveAt (x y : Int) (ρ : List Int) (a b : IE) (hx : IE.eval ρ a = x) (hy : IE.eval ρ b = y)
+    (h : ZPoly.beq (IE.norm a) (IE.norm b) = .true) : x = y :=
+  Eq.trans (Eq.symm hx) (Eq.trans (IE.prove ρ a b h) hy)
+
 def IntRing.expand : Macro := fun stx => Reify.expand "IE" stx
 syntax:lead (name := intRing) "int_ring!" term : term
 attribute [macro term.intRing] IntRing.expand
