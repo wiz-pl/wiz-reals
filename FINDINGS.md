@@ -33,7 +33,9 @@ Fixed in wiz PRs that are not merged yet. Branch `cleanup` of this repository us
 * Not fixed: **B2** (proofs count usage; wiz agent prf-conv-2), **P1** (computed
   equations vs `Eq.trans`: glued equations, #155; the `@Eq.trans Int x y z` stay),
   **P7** (#214), **S2** (glued equations), **S5** (not reproduced with a reconstruction
-  of the old Isqrt), P2–P5, P10, P11.
+  of the old Isqrt), P2–P5, P10.
+* **P11** (numerals printed as `OfNat.ofNat R 2 …`): fixed by wiz #202's printer
+  (tests/sqrt2.expected records `≈ 2`).
 
 ## Gaps
 
@@ -203,7 +205,7 @@ lemma whose type is the integer equation written out, proved by
 `congrArg Int.ofNat (nat_ring! …)`, then used at `≈` (src/Reals/Real.wiz
 `Q.ofNat_add2'`, src/Reals/Sqrt2.wiz `Sqrt2.err_eq'`).
 
-### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)`
+### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)` (fixed in wiz #202)
 
 `#check R.sqrt2_sq` prints `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`; at
 `Nat` and `Int` numerals print as numerals. (tests/sqrt2.expected)
