@@ -1,0 +1,94 @@
+import Reals.Ring
+-- The integer square root, by bisection, with its specification
+-- `isqrt n ^ 2 ≤ n < (isqrt n + 1) ^ 2`.
+--
+-- The midpoint is `(lo + hi) / 2` (native division), checked at run time to lie
+-- strictly between `lo` and `hi` (it always does; checking is cheaper than proving
+-- the lemmas about `Nat.div`, which lib/ doesn't have). Each choice is a function of a
+-- Boolean (`Isqrt.pick`, `Isqrt.step`), so the proofs can split on it.
+
+def Isqrt.pick : Bool → Nat → Nat → Nat
+  | .true, m, _ => m
+  | .false, _, lo => Nat.succ lo
+def Isqrt.mid (lo hi : Nat) : Nat :=
+  Isqrt.pick (Bool.and (Nat.lt lo ((lo + hi) / 2)) (Nat.lt ((lo + hi) / 2) hi)) ((lo + hi) / 2) lo
+-- `go lo hi`: continue with `[m, hi)` or `[lo, m)`
+def Isqrt.step : Bool → (Nat → Nat → Nat) → Nat → Nat → Nat → Nat
+  | .true, go, _, m, hi => go m hi
+  | .false, go, lo, m, _ => go lo m
+def Isqrt.stop : Bool → (Nat → Nat → Nat) → Nat → Nat → Nat
+  | .true, go, lo, hi => go lo hi
+  | .false, _, lo, _ => lo
+-- one round, with the recursive call `g` (a separate definition, so that the proof can
+-- name it: FINDINGS.md, S5)
+def Isqrt.body (n : Nat) (g : Nat → Nat → Nat) (lo hi : Nat) : Nat :=
+  Isqrt.stop (Nat.lt (Nat.succ lo) hi)
+    (fun lo hi => Isqrt.step (Nat.le (Isqrt.mid lo hi * Isqrt.mid lo hi) n) g lo (Isqrt.mid lo hi) hi)
+    lo hi
+def Isqrt.go (n : Nat) : Nat → Nat → Nat → Nat
+  | .zero, lo, _ => lo
+  | .succ f, lo, hi => Isqrt.body n (fun a b => Isqrt.go n f a b) lo hi
+def Nat.isqrt (n : Nat) : Nat := Isqrt.go n (Nat.succ n) 0 (Nat.succ n)
+
+-- ## Specification
+
+def Isqrt.Inv (n f lo hi : Nat) : Prop :=
+  Nat.Le (lo * lo) n ∧ (Nat.Lt n (hi * hi) ∧ (Nat.Lt lo hi ∧ Nat.Le hi (lo + f + 1)))
+def Isqrt.Spec (n r : Nat) : Prop := Nat.Le (r * r) n ∧ Nat.Lt n (Nat.succ r * Nat.succ r)
+
+def Bool.and_intro : (a b : Bool) → a = .true → b = .true → Bool.and a b = .true
+  | .true, _, _, h => h
+  | .false, _, h, _ => absurd h.1
+def Isqrt.pick_spec (lo hi m : Nat) (h : Nat.Lt (Nat.succ lo) hi) :
+    (b : Bool) → Bool.and (Nat.lt lo m) (Nat.lt m hi) = b → Nat.Lt lo (Isqrt.pick b m lo) ∧ Nat.Lt (Isqrt.pick b m lo) hi
+  | .true, e => (Bool.and_left _ _ e, Bool.and_right _ _ e)
+  | .false, _ => (Nat.le_refl (Nat.succ lo), h)
+def Isqrt.mid_spec (lo hi : Nat) (h : Nat.Lt (Nat.succ lo) hi) : Nat.Lt lo (Isqrt.mid lo hi) ∧ Nat.Lt (Isqrt.mid lo hi) hi :=
+  Isqrt.pick_spec lo hi ((lo + hi) / 2) h _ rfl
+
+-- `succ lo < hi` fails: `hi = succ lo`
+def Nat.eq_of_le_of_lt (a b : Nat) (h1 : Nat.Lt a b) (h2 : Nat.Le b (Nat.succ a)) : b = Nat.succ a :=
+  Nat.le_antisymm b (Nat.succ a) h2 h1
+def Nat.le_of_not_lt : (a b : Nat) → Nat.lt a b = .false → Nat.Le b a
+  | _, .zero, _ => rfl
+  | .zero, .succ _, h => absurd h.1
+  | .succ a, .succ b, h => Nat.le_of_not_lt a b h
+
+def Isqrt.step_spec (n f lo m hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi) (hm : Nat.Lt lo m ∧ Nat.Lt m hi)
+    (g : Nat → Nat → Nat) (ih : (lo' hi' : Nat) → Isqrt.Inv n f lo' hi' → Isqrt.Spec n (g lo' hi')) :
+    (b : Bool) → Nat.le (m * m) n = b → Isqrt.Spec n (Isqrt.step b g lo m hi)
+  | .true, e =>
+    ih m hi (e, (inv.2.1, (hm.2,
+      Nat.le_trans hi (lo + Nat.succ f + 1) (m + f + 1) inv.2.2.2
+        (Eq.mpr' (fun (z : Nat) => Nat.Le z (m + f + 1)) (nat_ring! lo + Nat.succ f + 1 = Nat.succ lo + f + 1)
+          (Nat.add_le_add_right 1 (Nat.succ lo + f) (m + f) (Nat.add_le_add_right f (Nat.succ lo) m hm.1))))))
+  | .false, e =>
+    ih lo m (inv.1, (Nat.not_le (m * m) n e, (hm.1,
+      Eq.mp' (fun (z : Nat) => Nat.Le (Nat.succ m) z) (nat_ring! lo + Nat.succ f + 1 = Nat.succ (lo + f + 1))
+        (Nat.le_trans (Nat.succ m) hi (lo + Nat.succ f + 1) hm.2 inv.2.2.2))))
+def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
+    (g : Nat → Nat → Nat) (ih : (lo' hi' : Nat) → Isqrt.Inv n f lo' hi' → Isqrt.Spec n (g lo' hi')) :
+    (b : Bool) → Nat.lt (Nat.succ lo) hi = b →
+    Isqrt.Spec n (Isqrt.stop b (fun lo hi => Isqrt.step (Nat.le (Isqrt.mid lo hi * Isqrt.mid lo hi) n) g lo (Isqrt.mid lo hi) hi) lo hi)
+  | .true, e =>
+    Isqrt.step_spec n f lo (Isqrt.mid lo hi) hi inv (Isqrt.mid_spec lo hi e) g ih _ rfl
+  | .false, e =>
+    let e' : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1 (Nat.le_of_not_lt (Nat.succ lo) hi e);
+    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e' inv.2.1)
+
+def Isqrt.go_spec (n : Nat) : (f lo hi : Nat) → Isqrt.Inv n f lo hi → Isqrt.Spec n (Isqrt.go n f lo hi)
+  | .zero, lo, hi, inv =>
+    let e : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1
+      (Eq.mp' (fun (z : Nat) => Nat.Le hi z) (nat_ring! lo + 0 + 1 = Nat.succ lo) inv.2.2.2);
+    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e inv.2.1)
+  | .succ f, lo, hi, inv =>
+    let g := fun a b => Isqrt.go n f a b;
+    let h : Isqrt.Spec n (Isqrt.body n g lo hi) :=
+      Isqrt.stop_spec n f lo hi inv g (fun lo' hi' i' => Isqrt.go_spec n f lo' hi' i') (Nat.lt (Nat.succ lo) hi) rfl;
+    h
+
+def Nat.lt_succ_mul_self (n : Nat) : Nat.Lt n (Nat.succ n * Nat.succ n) :=
+  Nat.le_of_eq_add (Nat.succ n) (Nat.succ n * Nat.succ n) (n * Nat.succ n) (nat_ring! Nat.succ n * Nat.succ n = Nat.succ n + n * Nat.succ n)
+def Nat.isqrt_spec (n : Nat) : Isqrt.Spec n (Nat.isqrt n) :=
+  Isqrt.go_spec n (Nat.succ n) 0 (Nat.succ n)
+    (Nat.le_zero n, (Nat.lt_succ_mul_self n, (Nat.le_zero n, Nat.le_add_right (Nat.succ n) 1)))
