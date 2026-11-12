@@ -67,7 +67,7 @@ def R.lim_spec (X : Nat → R) (h : R.RegSeq X) (n : Nat) : R.Dist (X n) (R.lim 
           (q_ring! Q.invS k + Q.invS j + ((Q.invS n + Q.invS K + (Q.invS j + Q.invS j)) + (Q.invS j + Q.invS K))
              ≈ Q.invS n + (Q.invS K + Q.invS K) + Q.invS k + 4 * Q.invS j)))
       (Q.trans (Q.add_congr (Q.add_congr (Q.refl (Q.invS n)) (Q.invS_double k)) (Q.refl (Q.invS k)))
-        (q_ring! Q.invS n + Q.invS k + Q.invS k ≈ Q.invS n + (Q.invS k + Q.invS k)))
+        (by ring))
 
 -- ## Continuity of `+` and `·`
 
@@ -90,7 +90,7 @@ def R.dist_close {ω x x' : R} {ω e : Q} (hx : R.Dist x x' e) (i i' n : Nat) (h
     (Q.chain _ (Q.abs (x.seq i - x.seq i') + Q.abs (x.seq i' - x'.seq i')) _
       (Q.abs_sub_le (x.seq i) (x.seq i') (x'.seq i'))
       (Q.add_le_add (Q.le_trans (x.reg i i') (Q.add_le_add a b)) (Q.le_trans (hx i') (Q.add_le_add (Q.le_refl e) (Q.add_le_add b b)))))
-    (q_ring! Q.invS n + Q.invS n + (e + (Q.invS n + Q.invS n)) ≈ e + 4 * Q.invS n)
+    (by ring)
 
 def Q.prod_close2 (a b a' b' A B e1 e2 : Q) (ha : Q.abs a ≤ A) (hb' : Q.abs b' ≤ B)
     (h1 : Q.abs (b - b') ≤ e1) (h2 : Q.abs (a - a') ≤ e2) : Q.abs (a * b - a' * b') ≤ A * e1 + B * e2 :=

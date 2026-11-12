@@ -1,4 +1,4 @@
-import Rat
+import RingTactic
 -- The rationals `1/(n+1)` and what regular sequences need of them.
 
 def Q.invS (n : Nat) : Q := Q.mk 1 (Int.ofNat (Nat.succ n)) (Int.ofNat_succ_pos n)

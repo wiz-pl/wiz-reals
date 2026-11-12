@@ -1,4 +1,4 @@
-import Ring
+import RingTactic
 -- The integer square root, by bisection, with its specification
 -- `isqrt n ^ 2 ≤ n < (isqrt n + 1) ^ 2`.
 --
@@ -88,7 +88,7 @@ def Isqrt.go_spec (n : Nat) : (f lo hi : Nat) → Isqrt.Inv n f lo hi → Isqrt.
     h
 
 def Nat.lt_succ_mul_self (n : Nat) : Nat.Lt n (Nat.succ n * Nat.succ n) :=
-  Nat.le_of_eq_add (Nat.succ n) (Nat.succ n * Nat.succ n) (n * Nat.succ n) (nat_ring! Nat.succ n * Nat.succ n = Nat.succ n + n * Nat.succ n)
+  Nat.le_of_eq_add (Nat.succ n) (Nat.succ n * Nat.succ n) (n * Nat.succ n) (by ring)
 def Nat.isqrt_spec (n : Nat) : Isqrt.Spec n (Nat.isqrt n) :=
   Isqrt.go_spec n (Nat.succ n) 0 (Nat.succ n)
     (Nat.zero_le n, (Nat.lt_succ_mul_self n, (Nat.zero_le n, Nat.le_add_right (Nat.succ n) 1)))
