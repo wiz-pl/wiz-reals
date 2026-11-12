@@ -1,0 +1,272 @@
+import Reals.Nat
+-- A decision procedure for equations of commutative semirings, at `Nat`, by reflection.
+--
+-- `NE` is a polynomial expression over atoms (indices into a list `ρ`). `NE.norm` puts it
+-- in a normal form: a list of monomials (coefficient, sorted list of atoms), sorted by
+-- the lexicographic order of the atom lists, with equal ones merged. `NE.prove` says
+-- that two expressions with the same normal form evaluate to the same number; the
+-- kernel checks `norm e₁ = norm e₂` by computing both sides.
+--
+-- Only soundness is proved (`eval (norm e) = eval e`); that the normal form is canonical
+-- is what makes the procedure useful, not what makes it correct.
+--
+-- The macro `nat_ring! lhs = rhs` (at the end) builds `e₁`, `e₂` and `ρ` from the syntax
+-- of the two sides: tactics can't read an equation in the goal (FINDINGS.md).
+
+inductive NE where
+  | atom (i : Nat)
+  | lit (n : Nat)
+  | add (a b : NE)
+  | mul (a b : NE)
+
+def NE.get : List Nat → Nat → Nat
+  | .nil, _ => 0
+  | .cons x _, .zero => x
+  | .cons _ xs, .succ i => NE.get xs i
+
+def NE.eval (ρ : List Nat) : NE → Nat
+  | .atom i => NE.get ρ i
+  | .lit n => n
+  | .add a b => NE.eval ρ a + NE.eval ρ b
+  | .mul a b => NE.eval ρ a * NE.eval ρ b
+
+-- ## Keys: sorted lists of atoms, and their order
+
+inductive Ord3 where
+  | lt
+  | eq
+  | gt
+
+def Ord3.andThen : Ord3 → Ord3 → Ord3
+  | .lt, _ => .lt
+  | .eq, o => o
+  | .gt, _ => .gt
+
+def Nat.cmp : Nat → Nat → Ord3
+  | .zero, .zero => .eq
+  | .zero, .succ _ => .lt
+  | .succ _, .zero => .gt
+  | .succ m, .succ n => Nat.cmp m n
+
+def Key.cmp : List Nat → List Nat → Ord3
+  | .nil, .nil => .eq
+  | .nil, .cons _ _ => .lt
+  | .cons _ _, .nil => .gt
+  | .cons x xs, .cons y ys => Ord3.andThen (Nat.cmp x y) (Key.cmp xs ys)
+
+def Nat.cmp_eq : (m n : Nat) → Nat.cmp m n = .eq → m = n
+  | .zero, .zero, _ => rfl
+  | .zero, .succ _, h => absurd h.1
+  | .succ _, .zero, h => absurd h.1
+  | .succ m, .succ n, h => congrArg Nat.succ (Nat.cmp_eq m n h)
+
+def Ord3.andThen_eq : (a b : Ord3) → Ord3.andThen a b = .eq → (a = .eq) ∧ (b = .eq)
+  | .lt, _, h => absurd h.1
+  | .eq, _, h => (rfl, h)
+  | .gt, _, h => absurd h.1
+
+def Key.cmp_eq : (xs ys : List Nat) → Key.cmp xs ys = .eq → xs = ys
+  | .nil, .nil, _ => rfl
+  | .nil, .cons _ _, h => absurd h.1
+  | .cons _ _, .nil, h => absurd h.1
+  | .cons x xs, .cons y ys, h =>
+    let hs := Ord3.andThen_eq (Nat.cmp x y) (Key.cmp xs ys) h;
+    congrArg2 List.cons (Nat.cmp_eq x y hs.1) (Key.cmp_eq xs ys hs.2)
+
+-- the product of the atoms of a key
+def Key.prod (ρ : List Nat) : List Nat → Nat
+  | .nil => 1
+  | .cons i xs => NE.get ρ i * Key.prod ρ xs
+
+-- insertion into a sorted key, and the merge of two keys
+def Key.insertB : Bool → Nat → Nat → List Nat → List Nat → List Nat
+  | .true, x, y, ys, _ => .cons x (.cons y ys)
+  | .false, _, y, _, rec => .cons y rec
+def Key.insert (x : Nat) : List Nat → List Nat
+  | .nil => .cons x .nil
+  | .cons y ys => Key.insertB (Nat.le x y) x y ys (Key.insert x ys)
+def Key.merge : List Nat → List Nat → List Nat
+  | .nil, ys => ys
+  | .cons x xs, ys => Key.insert x (Key.merge xs ys)
+
+-- ## Polynomials
+
+def Poly : Type := List (Nat × List Nat)
+
+def Poly.eval (ρ : List Nat) : Poly → Nat
+  | .nil => 0
+  | .cons m p => m.1 * Key.prod ρ m.2 + Poly.eval ρ p
+
+-- add the monomial `c·xs` to a sorted polynomial whose head is `d·ys`; `rec` is the
+-- result for the tail
+def Poly.addMonoO : Ord3 → Nat → List Nat → Nat → List Nat → Poly → Poly → Poly
+  | .lt, c, xs, d, ys, p, _ => .cons (c, xs) (.cons (d, ys) p)
+  | .eq, c, xs, d, _, p, _ => .cons (c + d, xs) p
+  | .gt, _, _, d, ys, _, rec => .cons (d, ys) rec
+def Poly.addMono (c : Nat) (xs : List Nat) : Poly → Poly
+  | .nil => .cons (c, xs) .nil
+  | .cons m p => Poly.addMonoO (Key.cmp xs m.2) c xs m.1 m.2 p (Poly.addMono c xs p)
+def Poly.add : Poly → Poly → Poly
+  | .nil, q => q
+  | .cons m p, q => Poly.addMono m.1 m.2 (Poly.add p q)
+def Poly.mulMono (c : Nat) (xs : List Nat) : Poly → Poly
+  | .nil => .nil
+  | .cons m q => Poly.addMono (c * m.1) (Key.merge xs m.2) (Poly.mulMono c xs q)
+def Poly.mul : Poly → Poly → Poly
+  | .nil, _ => .nil
+  | .cons m p, q => Poly.add (Poly.mulMono m.1 m.2 q) (Poly.mul p q)
+def Poly.const : Nat → Poly
+  | .zero => .nil
+  | .succ n => .cons (.succ n, .nil) .nil
+
+def NE.norm : NE → Poly
+  | .atom i => .cons (1, .cons i .nil) .nil
+  | .lit n => Poly.const n
+  | .add a b => Poly.add (NE.norm a) (NE.norm b)
+  | .mul a b => Poly.mul (NE.norm a) (NE.norm b)
+
+-- ## Soundness
+
+def Key.prod_insertB (ρ : List Nat) (x y : Nat) (ys rec : List Nat)
+    (ih : Key.prod ρ rec = NE.get ρ x * Key.prod ρ ys) :
+    (b : Bool) → Key.prod ρ (Key.insertB b x y ys rec) = NE.get ρ x * (NE.get ρ y * Key.prod ρ ys)
+  | .true => rfl
+  | .false => Eq.trans (congrArg (fun z => NE.get ρ y * z) ih)
+                (Nat.mul_left_comm (NE.get ρ y) (NE.get ρ x) (Key.prod ρ ys))
+def Key.prod_insert (ρ : List Nat) (x : Nat) : (ys : List Nat) →
+    Key.prod ρ (Key.insert x ys) = NE.get ρ x * Key.prod ρ ys
+  | .nil => rfl
+  | .cons y ys => Key.prod_insertB ρ x y ys (Key.insert x ys) (Key.prod_insert ρ x ys) (Nat.le x y)
+def Key.prod_merge (ρ : List Nat) : (xs ys : List Nat) →
+    Key.prod ρ (Key.merge xs ys) = Key.prod ρ xs * Key.prod ρ ys
+  | .nil, ys => Eq.symm (Nat.add_zero (Key.prod ρ ys))
+  | .cons x xs, ys =>
+    Eq.trans (Key.prod_insert ρ x (Key.merge xs ys))
+      (Eq.trans (congrArg (fun z => NE.get ρ x * z) (Key.prod_merge ρ xs ys))
+        (Eq.symm (Nat.mul_assoc (NE.get ρ x) (Key.prod ρ xs) (Key.prod ρ ys))))
+
+def Poly.eval_addMonoO (ρ : List Nat) (c : Nat) (xs : List Nat) (d : Nat) (ys : List Nat) (p rec : Poly)
+    (ih : Poly.eval ρ rec = c * Key.prod ρ xs + Poly.eval ρ p) :
+    (o : Ord3) → Key.cmp xs ys = o →
+    Poly.eval ρ (Poly.addMonoO o c xs d ys p rec) = c * Key.prod ρ xs + (d * Key.prod ρ ys + Poly.eval ρ p)
+  | .lt, _ => rfl
+  | .eq, h =>
+    let e := Key.cmp_eq xs ys h;
+    -- (c + d) * P xs + E = c * P xs + (d * P ys + E)
+    Eq.trans (congrArg (fun z => z + Poly.eval ρ p) (Nat.add_mul c d (Key.prod ρ xs)))
+      (Eq.trans (Nat.add_assoc (c * Key.prod ρ xs) (d * Key.prod ρ xs) (Poly.eval ρ p))
+        (congrArg (fun (zs : List Nat) => c * Key.prod ρ xs + (d * Key.prod ρ zs + Poly.eval ρ p)) e))
+  | .gt, _ =>
+    Eq.trans (congrArg (fun z => d * Key.prod ρ ys + z) ih)
+      (Nat.add_left_comm (d * Key.prod ρ ys) (c * Key.prod ρ xs) (Poly.eval ρ p))
+def Poly.eval_addMono (ρ : List Nat) (c : Nat) (xs : List Nat) : (p : Poly) →
+    Poly.eval ρ (Poly.addMono c xs p) = c * Key.prod ρ xs + Poly.eval ρ p
+  | .nil => rfl
+  | .cons m p =>
+    Poly.eval_addMonoO ρ c xs m.1 m.2 p (Poly.addMono c xs p) (Poly.eval_addMono ρ c xs p)
+      (Key.cmp xs m.2) rfl
+def Poly.eval_add (ρ : List Nat) : (p q : Poly) → Poly.eval ρ (Poly.add p q) = Poly.eval ρ p + Poly.eval ρ q
+  | .nil, _ => rfl
+  | .cons m p, q =>
+    Eq.trans (Poly.eval_addMono ρ m.1 m.2 (Poly.add p q))
+      (Eq.trans (congrArg (fun z => m.1 * Key.prod ρ m.2 + z) (Poly.eval_add ρ p q))
+        (Eq.symm (Nat.add_assoc (m.1 * Key.prod ρ m.2) (Poly.eval ρ p) (Poly.eval ρ q))))
+-- (c * d) * (P xs * P ys) = c * P xs * (d * P ys)
+def Poly.mono_mul (a b c d : Nat) : a * c * (b * d) = a * b * (c * d) :=
+  Eq.trans (Nat.mul_assoc a c (b * d))
+    (Eq.trans (congrArg (fun z => a * z) (Nat.mul_left_comm c b d))
+      (Eq.symm (Nat.mul_assoc a b (c * d))))
+def Poly.eval_mulMono (ρ : List Nat) (c : Nat) (xs : List Nat) : (q : Poly) →
+    Poly.eval ρ (Poly.mulMono c xs q) = c * Key.prod ρ xs * Poly.eval ρ q
+  | .nil => Eq.symm (Nat.mul_zero (c * Key.prod ρ xs))
+  | .cons m q =>
+    Eq.trans (Poly.eval_addMono ρ (c * m.1) (Key.merge xs m.2) (Poly.mulMono c xs q))
+      (Eq.trans
+        (congrArg2 (fun y z => y + z)
+          (Eq.trans (congrArg (fun z => c * m.1 * z) (Key.prod_merge ρ xs m.2))
+            (Poly.mono_mul c (Key.prod ρ xs) m.1 (Key.prod ρ m.2)))
+          (Poly.eval_mulMono ρ c xs q))
+        (Eq.symm (Nat.mul_add (c * Key.prod ρ xs) (m.1 * Key.prod ρ m.2) (Poly.eval ρ q))))
+def Poly.eval_mul (ρ : List Nat) : (p q : Poly) → Poly.eval ρ (Poly.mul p q) = Poly.eval ρ p * Poly.eval ρ q
+  | .nil, _ => rfl
+  | .cons m p, q =>
+    Eq.trans (Poly.eval_add ρ (Poly.mulMono m.1 m.2 q) (Poly.mul p q))
+      (Eq.trans (congrArg2 (fun y z => y + z) (Poly.eval_mulMono ρ m.1 m.2 q) (Poly.eval_mul ρ p q))
+        (Eq.symm (Nat.add_mul (m.1 * Key.prod ρ m.2) (Poly.eval ρ p) (Poly.eval ρ q))))
+def Poly.eval_const (ρ : List Nat) : (n : Nat) → Poly.eval ρ (Poly.const n) = n
+  | .zero => rfl
+  | .succ n => @Eq.trans Nat (Nat.succ n * 1 + 0) (Nat.succ n * 1) (Nat.succ n)
+                (Nat.add_zero (Nat.succ n * 1)) (Nat.mul_one (Nat.succ n))
+
+def NE.eval_norm (ρ : List Nat) : (e : NE) → Poly.eval ρ (NE.norm e) = NE.eval ρ e
+  | .atom i => Eq.trans (Nat.add_zero (1 * (NE.get ρ i * 1))) (Eq.trans (Nat.one_mul (NE.get ρ i * 1)) (Nat.mul_one (NE.get ρ i)))
+  | .lit n => Poly.eval_const ρ n
+  | .add a b => Eq.trans (Poly.eval_add ρ (NE.norm a) (NE.norm b)) (congrArg2 (fun y z => y + z) (NE.eval_norm ρ a) (NE.eval_norm ρ b))
+  | .mul a b => Eq.trans (Poly.eval_mul ρ (NE.norm a) (NE.norm b)) (congrArg2 (fun y z => y * z) (NE.eval_norm ρ a) (NE.eval_norm ρ b))
+
+def NE.prove (ρ : List Nat) (a b : NE) (h : NE.norm a = NE.norm b) : NE.eval ρ a = NE.eval ρ b :=
+  Eq.trans (Eq.symm (NE.eval_norm ρ a)) (Eq.trans (congrArg (Poly.eval ρ) h) (NE.eval_norm ρ b))
+
+-- ## The macro: `nat_ring! lhs = rhs`
+--
+-- Reification is syntactic: `+`, `*`, parentheses and numerals are understood, every
+-- other subterm is an atom (two atoms are the same when their syntax is).
+
+partial def Syn.beq : {ω b c : Bool} → SyntaxF b → SyntaxF c → Bool
+  | _, _, .missing, .missing => .true
+  | _, _, .atom x, .atom y => Expr.nameEq x y
+  | _, _, .ident x, .ident y => Expr.nameEq x y
+  | _, _, .node k xs, .node l ys => Bool.and (Expr.nameEq k l) (@Syn.beq _ _ xs ys)
+  | _, _, .nil, .nil => .true
+  | _, _, .cons x xs, .cons y ys => Bool.and (Syn.beq x y) (@Syn.beq _ _ xs ys)
+  | _, _, _, _ => .false
+
+-- the index of `x` in the atoms, or their number if it isn't there
+def Reify.find (x : Syntax) : List Syntax → Nat
+  | .nil => 0
+  | .cons y ys => if Syn.beq x y then 0 else Nat.succ (Reify.find x ys)
+def Reify.snoc (x : Syntax) : List Syntax → List Syntax
+  | .nil => .cons x .nil
+  | .cons y ys => .cons y (Reify.snoc x ys)
+def Reify.atom (x : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+  let i := Reify.find x atoms;
+  let atoms' := if Nat.beq i (List.length atoms) then Reify.snoc x atoms else atoms;
+  let n := Syntax.mkNode "term.num" (.cons (Syntax.mkNode "num" (.cons (.atom (Syntax.decimal i)) .nil)) .nil);
+  (`(term| NE.atom $n), atoms')
+
+-- `binop k stx`: the two operands, if `stx` is the binary operator `k`
+mutual
+def Reify.go (stx : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+  match stx with
+  | .node k args =>
+    if Expr.nameEq k "term.+" then Reify.bin "NE.add" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.*" then Reify.bin "NE.mul" (SyntaxF.nth args 0) (SyntaxF.nth args 2) atoms
+    else if Expr.nameEq k "term.paren" then Reify.go (SyntaxF.nth args 1) atoms
+    else if Expr.nameEq k "term.num" then (`(term| NE.lit $stx), atoms)
+    else Reify.atom stx atoms
+  | _ => Reify.atom stx atoms
+def Reify.bin (f : String) (a b : Syntax) (atoms : List Syntax) : Syntax × List Syntax :=
+  let ra := Reify.go a atoms;
+  let rb := Reify.go b ra.2;
+  (Syntax.mkApp (Syntax.mkVar f) (.cons ra.1 (.cons rb.1 .nil)), rb.2)
+end
+
+def Reify.list : List Syntax → Syntax
+  | .nil => `(term| List.nil)
+  | .cons x xs => let r := Reify.list xs; `(term| List.cons $x $r)
+
+def NatRing.expand : Macro := fun stx =>
+  let eqn := Syntax.getArg stx 1;
+  match eqn with
+  | .node k args =>
+    if Expr.nameEq k "term.eq" then
+      let l := Reify.go (SyntaxF.nth args 0) .nil;
+      let r := Reify.go (SyntaxF.nth args 2) l.2;
+      let ρ := Reify.list r.2;
+      let el := l.1;
+      let er := r.1;
+      MacroM.pure `(term| (NE.prove $ρ $el $er rfl : $eqn))
+    else MacroM.throw "nat_ring!: expected an equation `lhs = rhs`"
+  | _ => MacroM.throw "nat_ring!: expected an equation `lhs = rhs`"
+syntax:lead (name := natRing) "nat_ring!" term : term
+attribute [macro term.natRing] NatRing.expand

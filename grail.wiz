@@ -1,0 +1,6 @@
+import Grail
+-- `grail build`: check the library (every module under src/; the kernel checks every
+-- proof) and compile the √2 example, `.grail/bin/sqrt2`.
+-- `grail test`: the tests under tests/.
+def package : Package := Package.new "wiz-reals"
+  |> Package.lib "reals" "src"
