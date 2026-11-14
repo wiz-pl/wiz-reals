@@ -1,0 +1,39 @@
+tests/analysis.wiz:4:1: info: R.dist_symm : {ω x : R} → {ω y : R} → {ω e : Q} → R.Dist x y e → R.Dist y x e
+tests/analysis.wiz:5:1: info: 'R.dist_symm' does not depend on any axioms
+tests/analysis.wiz:6:1: info: R.dist_triangle : (x : R) → (y : R) → (z : R) → (e : Q) → (e' : Q) → R.Dist x y e → R.Dist y z e' → R.Dist x z (e + e')
+tests/analysis.wiz:7:1: info: 'R.dist_triangle' does not depend on any axioms
+tests/analysis.wiz:8:1: info: R.dist_neg : {ω x : R} → {ω y : R} → {ω e : Q} → R.Dist x y e → R.Dist (-x) (-y) e
+tests/analysis.wiz:9:1: info: 'R.dist_neg' does not depend on any axioms
+tests/analysis.wiz:10:1: info: R.dist_of_forall_add : (x : R) → (y : R) → (e : Q) → (K : Nat) → ((m : Nat) → R.Dist x y (e + Q.ofNat K * Q.invS m)) → R.Dist x y e
+tests/analysis.wiz:11:1: info: 'R.dist_of_forall_add' does not depend on any axioms
+tests/analysis.wiz:12:1: info: R.dist_zero_of_two_invS : (x : R) → (y : R) → ((n : Nat) → R.Dist x y (Q.invS n + Q.invS n)) → R.Dist x y 0
+tests/analysis.wiz:13:1: info: 'R.dist_zero_of_two_invS' does not depend on any axioms
+tests/analysis.wiz:14:1: info: R.eq_of_dist_two_invS : (x : R) → (y : R) → ((n : Nat) → R.Dist x y (Q.invS n + Q.invS n)) → x ≈ y
+tests/analysis.wiz:15:1: info: 'R.eq_of_dist_two_invS' does not depend on any axioms
+tests/analysis.wiz:16:1: info: R.lim_dist : (X : Nat → R) → (h : R.RegSeq X) → (n : Nat) → R.Dist (R.lim X h) (X n) (Q.invS n)
+tests/analysis.wiz:17:1: info: 'R.lim_dist' does not depend on any axioms
+tests/analysis.wiz:18:1: info: R.lim_congr : (X : Nat → R) → (Y : Nat → R) → (hX : R.RegSeq X) → (hY : R.RegSeq Y) → ((n : Nat) → X n ≈ Y n) → R.lim X hX ≈ R.lim Y hY
+tests/analysis.wiz:19:1: info: 'R.lim_congr' does not depend on any axioms
+tests/analysis.wiz:20:1: info: R.lim_unique : (X : Nat → R) → (h : R.RegSeq X) → (x : R) → ((n : Nat) → R.Dist (X n) x (Q.invS n)) → x ≈ R.lim X h
+tests/analysis.wiz:21:1: info: 'R.lim_unique' does not depend on any axioms
+tests/analysis.wiz:23:1: info: R.Nested : Type
+tests/analysis.wiz:24:1: info: R.Nested.lim : R.Nested → R
+tests/analysis.wiz:25:1: info: R.Nested.lo_dist : (N : R.Nested) → (n : Nat) → R.Dist (N.1 n) (R.Nested.lim N) (Q.invS n)
+tests/analysis.wiz:26:1: info: 'R.Nested.lo_dist' does not depend on any axioms
+tests/analysis.wiz:27:1: info: R.Nested.hi_dist : (N : R.Nested) → (n : Nat) → R.Dist (N.2.1 n) (R.Nested.lim N) (Q.invS n + Q.invS n)
+tests/analysis.wiz:28:1: info: 'R.Nested.hi_dist' does not depend on any axioms
+tests/analysis.wiz:30:1: info: R.Continuous : (R → R) → Type
+tests/analysis.wiz:31:1: info: R.Bracket : (R → R) → Type
+tests/analysis.wiz:32:1: info: R.Bracket.upper : (f : R → R) → (B : R.Bracket f) → R.Continuous f → (K : Nat) → (k : Nat) → (f (R.Nested.lim B.1)).1 k ≤ Q.invS K + 3 * Q.invS k
+tests/analysis.wiz:33:1: info: 'R.Bracket.upper' does not depend on any axioms
+tests/analysis.wiz:34:1: info: R.Bracket.lower : (f : R → R) → (B : R.Bracket f) → R.Continuous f → (K : Nat) → (k : Nat) → - (Q.invS K + 3 * Q.invS k) ≤ (f (R.Nested.lim B.1)).1 k
+tests/analysis.wiz:35:1: info: 'R.Bracket.lower' does not depend on any axioms
+tests/analysis.wiz:36:1: info: R.Bracket.bound : (f : R → R) → (B : R.Bracket f) → R.Continuous f → (K : Nat) → (k : Nat) → Q.abs ((f (R.Nested.lim B.1)).1 k) ≤ Q.invS K + 3 * Q.invS k
+tests/analysis.wiz:37:1: info: 'R.Bracket.bound' does not depend on any axioms
+tests/analysis.wiz:38:1: info: R.Bracket.root : (f : R → R) → (B : R.Bracket f) → R.Continuous f → R.Dist (f (R.Nested.lim B.1)) 0 0
+tests/analysis.wiz:39:1: info: 'R.Bracket.root' does not depend on any axioms
+tests/analysis.wiz:40:1: info: R.ivt_approx : (f : R → R) → R.Continuous f → (B : R.Bracket f) → R.Dist (f (R.Nested.lim B.1)) 0 0
+tests/analysis.wiz:41:1: info: 'R.ivt_approx' does not depend on any axioms
+tests/analysis.wiz:42:1: info: R.continuous_const : (c : R) → R.Continuous (fun _ => c)
+tests/analysis.wiz:43:1: info: 'R.continuous_const' does not depend on any axioms
+tests/analysis.wiz:59:1: info: R.ivt_approx (fun _ => (0 : R)) (R.continuous_const 0) zeroBracket : R.Dist 0 0 0

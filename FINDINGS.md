@@ -255,6 +255,25 @@ In a definition by equations with a parameter before the colon,
 the structural argument only) is rejected: "recursive call of Isqrt.go on n, which is
 not a recursive field". Eta-expanding, `(fun a b => Isqrt.go n f a b)`, works.
 
+### P13. A projected structured field in a large expected type does not elaborate
+
+While proving the upper and lower endpoint bounds for `R.ivt_approx`, the same
+proof finished in seconds with the width as a *hypothesis* but timed out under
+`light` when the width came from the structure field:
+
+```wiz
+def t (N : R.Nested) (n : Nat) (hw : R.Dist (N.hi n) (N.lo n) (Q.invS n)) : … := …
+-- `hw` is fine; `N.width n` at the same place is not (180 s, no error)
+```
+
+`R.Nested.width : (n : Nat) → R.Dist (lo n) (hi n) (Q.invS n)` mentions the
+structure's other fields, and matching its result against an expected
+`R.Dist (N.hi n) (R.Nested.lim N) …` appears to unfold the structure instead of
+projecting it. Here: `R.Bracket` carries `hi_close` as its own field, so the
+lower-endpoint proof projects a plain hypothesis, and `R.Nested.hi_dist` is used
+only where the expected type is small. A minimal standalone reproducer would be
+useful; the workaround is cheap and keeps every proof checked.
+
 ## Slowness
 
 ### S1. A unification failure under a binder takes 17–80 s
@@ -386,8 +405,22 @@ Deferred, with the timeboxed attempts in `timebox/order-deferred.md`:
 * **The inverse of a real apart from zero** and the field law `x · x⁻¹ ≈ 1`.
   `R.Pos` now gives the uniform tail bound an inverse needs, so this is unblocked
   in shape; the reciprocal sequence and its regularity are not written.
-* **The intermediate value theorem** (approximate form). Continuity is stated
-  (`R.add_dist`, `R.mul_dist`) but not for general functions.
+* **Constructing the IVT bisection certificate.** `Reals.Analysis` proves the
+  analysis half: `R.lim_congr`, `R.lim_unique`, the nested-interval API
+  (`R.Nested`), and `R.ivt_approx`: if a continuous `f` comes with an `R.Bracket`
+  whose lower endpoints satisfy `f(loₙ)ₖ ≤ 1/(k+1)`, whose upper endpoints satisfy
+  `-1/(k+1) ≤ f(hiₙ)ₖ`, and whose upper endpoints stay within `2/(n+1)` of the
+  limit, then `f` is zero at `R.Nested.lim`. What is *not* written is the
+  construction of that bracket from `R.Lt (f a) 0` and `R.Lt 0 (f b)`. That step is
+  the located sign test: at each midpoint it decides `f(mid) ≤ 0` or `0 ≤ f(mid)`.
+  `R.Le`/`R.Lt` are not total (DESIGN.md), so this needs either a sign oracle or
+  Bishop's approximate-sign bookkeeping (compare a rational approximation and keep
+  a slack); it is the constructive/classical boundary, not a missing algebra lemma.
+  The theorem is stated with `R.Dist`, so no `add_le_add`/`le_antisymm` was needed.
+  `R.Nested` stores the width as `R.Dist (lo n) (hi n) (1/(n+1))`; the sign
+  certificate `R.Bracket` also carries `hi_close`, the distance from `hi n` to the
+  limit, because elaborating the field projection `R.Nested.width` at a large
+  expected type did not finish (P13).
 
 ## Not written in Wiz
 

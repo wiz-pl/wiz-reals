@@ -1,0 +1,324 @@
+import Reals.Complete
+import Reals.RealOrder
+-- ## The analysis layer: distances, limits, and the bisection lemma
+--
+-- `R.Dist` is the primary order API (DESIGN.md): `|xₖ - yₖ| ≤ e + 2/(k+1)`.
+-- This module adds the distance algebra that completeness and the intermediate
+-- value theorem need, then `R.Nested` (a shrinking sequence of intervals) and the
+-- root theorem that the bisection in `R.ivt` feeds.
+--
+-- Nothing here uses classical choice or `le_total` on `R`: a real is a regular
+-- sequence and every witness is data. `R.Le`/`R.Lt` are not total; see the
+-- constructive boundary in DESIGN.md and FINDINGS.md.
+
+-- ## Distance algebra
+
+-- `R.Dist` is symmetric.
+def R.dist_symm {ω x y : R} {ω e : Q} (h : R.Dist x y e) : R.Dist y x e := fun k =>
+  Q.le_trans (Q.le_of_eq (Q.abs_sub_comm (y.seq k) (x.seq k))) (h k)
+
+-- A distance can be weakened.
+def R.dist_mono {ω x y : R} {ω e e' : Q} (h : R.Dist x y e) (he : e ≤ e') : R.Dist x y e' :=
+  fun k => Q.le_trans (h k) (Q.add_le_add_right (Q.invS k + Q.invS k) he)
+
+-- The triangle inequality: `|x - z| ≤ |x - y| + |y - z|`, with the constant 4 slack
+-- absorbed by `R.dist_of_bound`.
+def R.dist_triangle (x y z : R) (e e' : Q)
+    (h1 : R.Dist x y e) (h2 : R.Dist y z e') : R.Dist x z (e + e') :=
+  R.dist_of_bound x z (e + e') 4 (fun k =>
+    let B := Q.abs (x.seq k - y.seq k) + Q.abs (y.seq k - z.seq k);
+    let C := e + (Q.invS k + Q.invS k) + (e' + (Q.invS k + Q.invS k));
+    Q.chainEq _ C _
+      (Q.chain _ B _
+        (Q.abs_sub_le (x.seq k) (y.seq k) (z.seq k)) (Q.add_le_add (h1 k) (h2 k)))
+      (q_ring! e + (Q.invS k + Q.invS k) + (e' + (Q.invS k + Q.invS k))
+         ≈ e + e' + 4 * Q.invS k))
+
+def Q.neg_sub (a b : Q) : -a - -b ≈ -(a - b) := q_ring! -a - -b ≈ -(a - b)
+
+-- Negation preserves distances.
+def R.dist_neg {ω x y : R} {ω e : Q} (h : R.Dist x y e) : R.Dist (-x) (-y) e := fun k =>
+  Q.le_trans
+    (Q.le_of_eq (Q.trans (Q.abs_congr (Q.neg_sub (x.seq k) (y.seq k)))
+      (Q.abs_neg (x.seq k - y.seq k))))
+    (h k)
+
+-- `R.Dist x y 0` is `x ≈ y`, and conversely.
+def R.dist_of_approx {ω x y : R} (h : x ≈ y) : R.Dist x y 0 := R.dist_of_eq h
+def R.approx_of_dist {ω x y : R} (h : R.Dist x y 0) : x ≈ y := R.eq_of_dist h
+
+-- If the distance is at most `2/(n+1)` for every `n`, it is zero.
+def R.dist_zero_of_two_invS (x y : R) (h : (n : Nat) → R.Dist x y (Q.invS n + Q.invS n)) :
+    R.Dist x y 0 := fun k =>
+  Q.chainEq (Q.abs (x.seq k - y.seq k)) (Q.invS k + Q.invS k) (0 + (Q.invS k + Q.invS k))
+    (Q.le_of_forall_le_add (Q.abs (x.seq k - y.seq k)) (Q.invS k + Q.invS k) 2 (fun n =>
+      Q.chainEq (Q.abs (x.seq k - y.seq k)) ((Q.invS n + Q.invS n) + (Q.invS k + Q.invS k))
+        (Q.invS k + Q.invS k + 2 * Q.invS n)
+        (h n k)
+        (q_ring! (Q.invS n + Q.invS n) + (Q.invS k + Q.invS k)
+           ≈ Q.invS k + Q.invS k + 2 * Q.invS n)))
+    (q_ring! Q.invS k + Q.invS k ≈ 0 + (Q.invS k + Q.invS k))
+
+def R.eq_of_dist_two_invS (x y : R) (h : (n : Nat) → R.Dist x y (Q.invS n + Q.invS n)) :
+    x ≈ y := R.eq_of_dist (R.dist_zero_of_two_invS x y h)
+
+-- ## Completeness: the limit is natural
+
+-- The limit is the limit of the sequence (the symmetric form of `R.lim_spec`).
+def R.lim_dist (X : Nat → R) (h : R.RegSeq X) (n : Nat) :
+    R.Dist (R.lim X h) (X n) (Q.invS n) := R.dist_symm (R.lim_spec X h n)
+
+-- Limits of pointwise-equal regular sequences are equal.
+def R.lim_congr (X Y : Nat → R) (hX : R.RegSeq X) (hY : R.RegSeq Y)
+    (h : (n : Nat) → X n ≈ Y n) : R.lim X hX ≈ R.lim Y hY :=
+  let hd : (n : Nat) → R.Dist (R.lim X hX) (R.lim Y hY) (Q.invS n + Q.invS n) := fun n =>
+    R.dist_mono
+      (R.dist_triangle (R.lim X hX) (Y n) (R.lim Y hY) (Q.invS n + 0) (Q.invS n)
+        (R.dist_triangle (R.lim X hX) (X n) (Y n) (Q.invS n) 0
+          (R.lim_dist X hX n) (R.dist_of_approx (h n)))
+        (R.lim_spec Y hY n))
+      (Q.le_of_eq (q_ring! (Q.invS n + 0) + Q.invS n ≈ Q.invS n + Q.invS n));
+  R.eq_of_dist_two_invS (R.lim X hX) (R.lim Y hY) hd
+
+-- A sequence converging to `x` with rate `1/(n+1)` has `x` as its limit.
+def R.lim_unique (X : Nat → R) (h : R.RegSeq X) (x : R)
+    (hx : (n : Nat) → R.Dist (X n) x (Q.invS n)) : x ≈ R.lim X h :=
+  let hd : (n : Nat) → R.Dist x (R.lim X h) (Q.invS n + Q.invS n) := fun n =>
+    R.dist_triangle x (X n) (R.lim X h) (Q.invS n) (Q.invS n) (R.dist_symm (hx n)) (R.lim_spec X h n);
+  R.eq_of_dist_two_invS x (R.lim X h) hd
+
+-- A distance that is at most `e + K/(m+1)` for every `m` is at most `e`.
+def R.dist_of_forall_add (x y : R) (e : Q) (K : Nat)
+    (h : (m : Nat) → R.Dist x y (e + Q.ofNat K * Q.invS m)) : R.Dist x y e := fun k =>
+  Q.le_of_forall_le_add (Q.abs (x.seq k - y.seq k)) (e + (Q.invS k + Q.invS k)) K (fun m =>
+    Q.chainEq (Q.abs (x.seq k - y.seq k)) ((e + Q.ofNat K * Q.invS m) + (Q.invS k + Q.invS k))
+      ((e + (Q.invS k + Q.invS k)) + Q.ofNat K * Q.invS m)
+      (h m k)
+      (q_ring! (e + Q.ofNat K * Q.invS m) + (Q.invS k + Q.invS k)
+         ≈ (e + (Q.invS k + Q.invS k)) + Q.ofNat K * Q.invS m))
+
+-- ## Shrinking intervals
+
+-- A nested sequence of closed intervals: the lower endpoints nest (each later one is
+-- within `1/(m+1)` of an earlier one), and the `n`-th interval has width at most
+-- `1/(n+1)`. The upper endpoints need only be that close to the lower ones, so no
+-- separate monotonicity is stored. This is the data a bisection produces;
+-- `R.Nested.lim` is the point it converges to.
+structure R.Nested where
+  lo : Nat → R
+  hi : Nat → R
+  regLo : R.RegSeq lo
+  width : (n : Nat) → R.Dist (lo n) (hi n) (Q.invS n)
+  lo_nested : (m n : Nat) → Nat.Le m n → R.Dist (lo m) (lo n) (Q.invS m)
+
+def R.Nested.lim (N : R.Nested) : R := R.lim N.lo N.regLo
+
+def R.Nested.lo_dist (N : R.Nested) (n : Nat) : R.Dist (N.lo n) (R.Nested.lim N) (Q.invS n) :=
+  R.lim_spec N.lo N.regLo n
+
+def R.Nested.hi_dist (N : R.Nested) (n : Nat) :
+    R.Dist (N.hi n) (R.Nested.lim N) (Q.invS n + Q.invS n) :=
+  R.dist_triangle (N.hi n) (N.lo n) (R.Nested.lim N) (Q.invS n) (Q.invS n)
+    (R.dist_symm (N.width n)) (R.Nested.lo_dist N n)
+
+-- ## From the order to pointwise rational bounds
+
+-- `-c ≤ b - a` gives `a ≤ b + c`.
+def Q.le_add_of_neg_le_sub (a b c : Q) (h : -c ≤ b - a) : a ≤ b + c :=
+  Q.le_iff_mpr (Q.nonneg_of_le
+    (Q.le_congr (q_ring! -c + c ≈ (0 : Q)) (q_ring! (b - a) + c ≈ b + c - a)
+      (Q.add_le_add_right c h)))
+
+-- `a - b ≤ S` gives `a ≤ b + S`.
+def Q.le_add_of_sub_le (a b S : Q) (h : a - b ≤ S) : a ≤ b + S :=
+  Q.le_congr (q_ring! (a - b) + b ≈ a) (q_ring! S + b ≈ b + S)
+    (Q.add_le_add_right b h)
+
+-- `-c ≤ a + b` gives `-b - c ≤ a`.
+def Q.neg_sub_le_of_le_add (a b c : Q) (h : -c ≤ a + b) : -b - c ≤ a :=
+  Q.le_congr (q_ring! -c + -b ≈ -b - c) (q_ring! (a + b) + -b ≈ a)
+    (Q.add_le_add_right (-b) h)
+
+-- A lower order bound `x ≤ e` read pointwise: `xₖ ≤ e + 1/(k+1)`.
+def R.le_const_upper {ω x : R} {ω e : Q} (h : R.Le x (R.ofQ e)) (k : Nat) :
+    x.seq k ≤ e + Q.invS k :=
+  Q.le_of_forall_le_add (x.seq k) (e + Q.invS k) 2 (fun m =>
+    let j := R.leIdx m;
+    let hm : Nat.Le m j := Nat.le_leIdx m;
+    let hxj : x.seq j ≤ e + Q.invS m :=
+      Q.le_add_of_neg_le_sub (x.seq j) e (Q.invS m) (h m);
+    let hkj : x.seq k - x.seq j ≤ Q.invS k + Q.invS j := R.diff_upper x k j;
+    let hk : x.seq k ≤ x.seq j + (Q.invS k + Q.invS j) :=
+      Q.le_add_of_sub_le (x.seq k) (x.seq j) (Q.invS k + Q.invS j) hkj;
+    let h1 : x.seq k ≤ (e + Q.invS m) + (Q.invS k + Q.invS j) :=
+      Q.le_trans hk (Q.add_le_add_right (Q.invS k + Q.invS j) hxj);
+    let hiso : Q.invS m + Q.invS j ≤ Q.invS m + Q.invS m :=
+      Q.add_le_add (Q.le_refl (Q.invS m)) (Q.invS_anti m j hm);
+    let L2 := (e + Q.invS k) + (Q.invS m + Q.invS j);
+    let h2 : x.seq k ≤ L2 :=
+      Q.chainEq (x.seq k) ((e + Q.invS m) + (Q.invS k + Q.invS j)) L2 h1
+        (q_ring! (e + Q.invS m) + (Q.invS k + Q.invS j)
+           ≈ (e + Q.invS k) + (Q.invS m + Q.invS j));
+    let h3 : L2 ≤ (e + Q.invS k) + 2 * Q.invS m :=
+      Q.le_congr (Q.refl L2)
+        (q_ring! (e + Q.invS k) + (Q.invS m + Q.invS m) ≈ (e + Q.invS k) + 2 * Q.invS m)
+        (Q.add_le_add_left (e + Q.invS k) hiso);
+    Q.chain (x.seq k) L2 ((e + Q.invS k) + 2 * Q.invS m) h2 h3)
+
+-- `-S ≤ a - b` gives `b - S ≤ a`.
+def Q.sub_le_add_of_neg_le_sub (a b S : Q) (h : -S ≤ a - b) : b - S ≤ a :=
+  Q.le_congr (q_ring! -S + b ≈ b - S) (q_ring! (a - b) + b ≈ a)
+    (Q.add_le_add_right b h)
+
+def Q.le_add_self (p q : Q) (hq : 0 ≤ q) : p ≤ p + q :=
+  Q.le_congr (q_ring! p + 0 ≈ p) (Q.refl (p + q)) (Q.add_le_add (Q.le_refl p) hq)
+
+-- `a - b ≤ S` gives `a - S ≤ b`.
+def Q.sub_le_of_le_sub (a b S : Q) (h : a - b ≤ S) : a - S ≤ b :=
+  Q.le_congr (q_ring! ((a - b) + b) + -S ≈ a - S) (q_ring! (S + b) + -S ≈ b)
+    (Q.add_le_add_right (-S) (Q.add_le_add_right b h))
+
+-- The two pointwise consequences of a distance bound.
+def R.dist_upper {ω x y : R} {ω e : Q} (h : R.Dist x y e) (k : Nat) :
+    x.seq k ≤ y.seq k + (e + (Q.invS k + Q.invS k)) :=
+  Q.le_add_of_sub_le (x.seq k) (y.seq k) (e + (Q.invS k + Q.invS k))
+    (Q.le_of_abs_le (h k))
+
+def R.dist_lower {ω x y : R} {ω e : Q} (h : R.Dist x y e) (k : Nat) :
+    y.seq k - (e + (Q.invS k + Q.invS k)) ≤ x.seq k :=
+  Q.sub_le_of_le_sub (y.seq k) (x.seq k) (e + (Q.invS k + Q.invS k))
+    (Q.le_congr (q_ring! -(x.seq k - y.seq k) ≈ y.seq k - x.seq k)
+      (Q.refl (e + (Q.invS k + Q.invS k)))
+      (Q.neg_le_of_abs_le (h k)))
+
+def R.zero_seq (k : Nat) : (0 : R).seq k ≈ (0 : Q) := rfl
+def Q.sub_zero (a : Q) : a - 0 ≈ a := q_ring! a - 0 ≈ a
+
+-- A pointwise bound `|xₖ| ≤ 3/(k+1)` gives `x ≈ 0` (regularity improves 3 to 1).
+def R.dist_zero_of_three_invS (x : R)
+    (h : (j : Nat) → Q.abs (x.seq j) ≤ Q.ofNat 3 * Q.invS j) : R.Dist x 0 0 := fun k =>
+  let habs : Q.abs (x.seq k) ≤ Q.invS k :=
+    Q.le_of_forall_le_add (Q.abs (x.seq k)) (Q.invS k) 4 (fun j =>
+      Q.chain (Q.abs (x.seq k))
+        (Q.abs (x.seq k - x.seq j) + Q.abs (x.seq j))
+        (Q.invS k + 4 * Q.invS j)
+        (Q.chain (Q.abs (x.seq k)) (Q.abs ((x.seq k - x.seq j) + x.seq j))
+          (Q.abs (x.seq k - x.seq j) + Q.abs (x.seq j))
+          (Q.le_of_eq (Q.abs_congr (q_ring! x.seq k ≈ (x.seq k - x.seq j) + x.seq j)))
+          (Q.abs_add (x.seq k - x.seq j) (x.seq j)))
+        (Q.chainEq (Q.abs (x.seq k - x.seq j) + Q.abs (x.seq j))
+          (Q.invS k + Q.invS j + 3 * Q.invS j) (Q.invS k + 4 * Q.invS j)
+          (Q.add_le_add (x.reg k j) (h j))
+          (q_ring! Q.invS k + Q.invS j + 3 * Q.invS j ≈ Q.invS k + 4 * Q.invS j)));
+  let h1 : Q.abs (x.seq k - (0 : R).seq k) ≤ Q.abs (x.seq k) :=
+    Q.le_of_eq (Q.abs_congr
+      (Q.trans (Q.sub_congr (Q.refl (x.seq k)) (R.zero_seq k)) (Q.sub_zero (x.seq k))));
+  let h2 : Q.abs (x.seq k) ≤ 0 + (Q.invS k + Q.invS k) :=
+    Q.chain (Q.abs (x.seq k)) (Q.invS k) (0 + (Q.invS k + Q.invS k)) habs
+      (Q.le_congr (Q.refl (Q.invS k))
+        (q_ring! Q.invS k + Q.invS k ≈ 0 + (Q.invS k + Q.invS k))
+        (Q.le_add_self (Q.invS k) (Q.invS k) (Q.invS_nonneg k)));
+  Q.chain (Q.abs (x.seq k - (0 : R).seq k)) (Q.abs (x.seq k)) (0 + (Q.invS k + Q.invS k)) h1 h2
+
+-- ## Continuity and the bisection root theorem
+
+-- Pointwise continuity with an explicit modulus: for every `x` and `e > 0` there is
+-- `d > 0` such that `R.Dist x y d` gives `R.Dist (f x) (f y) e`. The modulus is data
+-- (a `Σ`), not a proposition, so the proof can use it (DESIGN.md).
+def R.Continuous (f : R → R) : Type :=
+  (x : R) → (e : Q) → 0 < e →
+    (d : Q) × (0 < d) × ((y : R) → R.Dist x y d → R.Dist (f x) (f y) e)
+
+-- The sign certificate a bisection maintains: the lower endpoint is below `1/(n+1)`
+-- and the upper endpoint above `-1/(n+1)`, pointwise. Producing this certificate from
+-- a continuous `f` is the located sign test (the constructive boundary); proving that
+-- its limit is a root is `R.Bracket.root` below.
+structure R.Bracket (f : R → R) where
+  nested : R.Nested
+  hi_close : (n : Nat) → R.Dist (nested.hi n) (R.Nested.lim nested) (Q.invS n + Q.invS n)
+  lo_sign : (n k : Nat) → (f (nested.lo n)).seq k ≤ Q.invS k
+  hi_sign : (n k : Nat) → -(Q.invS k) ≤ (f (nested.hi n)).seq k
+
+def Q.add_neg_sub (a b : Q) : a + -b ≈ a - b := q_ring! a + -b ≈ a - b
+def Q.neg_add_sub (a b : Q) : -a + -b ≈ -a - b := q_ring! -a + -b ≈ -a - b
+def Q.pack_sub (a b : Q) : a + (b + (a + a)) ≈ b + 3 * a := q_ring! a + (b + (a + a)) ≈ b + 3 * a
+def Q.neg_sub_pack (a b : Q) : -a - (b + (a + a)) ≈ -(b + 3 * a) :=
+  q_ring! -a - (b + (a + a)) ≈ -(b + 3 * a)
+
+def R.Bracket.upper (f : R → R) (B : R.Bracket f) (hf : R.Continuous f) (K k : Nat) :
+    (f (R.Nested.lim B.nested)).seq k ≤ Q.invS K + 3 * Q.invS k :=
+  let lim := R.Nested.lim B.nested;
+  let d := (hf lim (Q.invS K) (Q.invS_pos K)).1;
+  let N := 2 * Int.natAbs d.den;
+  let hsmall : Q.ofNat 2 * Q.invS N < d :=
+    Q.small d (Q.pos_of_lt (hf lim (Q.invS K) (Q.invS_pos K)).2.1) 2;
+  let h2d : Q.ofNat 2 * Q.invS N ≤ d := Q.le_of_lt hsmall;
+  let hdn : R.Dist (B.nested.lo N) lim d :=
+    R.dist_mono (R.Nested.lo_dist B.nested N)
+      (Q.le_trans
+        (Q.le_congr (Q.refl (Q.invS N)) (Q.symm (Q.two_mul (Q.invS N)))
+          (Q.le_add_self (Q.invS N) (Q.invS N) (Q.invS_nonneg N))) h2d);
+  let hcl := (hf lim (Q.invS K) (Q.invS_pos K)).2.2 (B.nested.lo N) (R.dist_symm hdn);
+  let S := Q.invS K + (Q.invS k + Q.invS k);
+  let hup1 : (f lim).seq k ≤ (f (B.nested.lo N)).seq k + S := R.dist_upper hcl k;
+  let hup2 : (f (B.nested.lo N)).seq k ≤ Q.invS k := B.lo_sign N k;
+  let hup3 : (f lim).seq k ≤ Q.invS k + S := Q.le_trans hup1 (Q.add_le_add_right S hup2);
+  Q.chainEq ((f lim).seq k) (Q.invS k + (Q.invS K + (Q.invS k + Q.invS k)))
+    (Q.invS K + 3 * Q.invS k) hup3
+    (Q.pack_sub (Q.invS k) (Q.invS K))
+
+def R.Bracket.lower (f : R → R) (B : R.Bracket f) (hf : R.Continuous f) (K k : Nat) :
+    -(Q.invS K + 3 * Q.invS k) ≤ (f (R.Nested.lim B.nested)).seq k :=
+  let lim := R.Nested.lim B.nested;
+  let d := (hf lim (Q.invS K) (Q.invS_pos K)).1;
+  let N := 2 * Int.natAbs d.den;
+  let hsmall : Q.ofNat 2 * Q.invS N < d :=
+    Q.small d (Q.pos_of_lt (hf lim (Q.invS K) (Q.invS_pos K)).2.1) 2;
+  let h2d : Q.invS N + Q.invS N ≤ d :=
+    Q.le_of_lt (Q.lt_congr (Q.two_mul (Q.invS N)) (Q.refl d) hsmall);
+  let hdh : R.Dist (B.nested.hi N) lim d := R.dist_mono (B.hi_close N) h2d;
+  let hch := (hf lim (Q.invS K) (Q.invS_pos K)).2.2 (B.nested.hi N) (R.dist_symm hdh);
+  let S := Q.invS K + (Q.invS k + Q.invS k);
+  let hlo1 : (f (B.nested.hi N)).seq k - S ≤ (f lim).seq k := R.dist_lower hch k;
+  let hlo2 : -(Q.invS k) ≤ (f (B.nested.hi N)).seq k := B.hi_sign N k;
+  let hlo3 : -Q.invS k - S ≤ (f lim).seq k :=
+    Q.le_trans
+      (Q.le_congr (Q.neg_add_sub (Q.invS k) S)
+        (Q.add_neg_sub ((f (B.nested.hi N)).seq k) S)
+        (Q.add_le_add_right (-S) hlo2)) hlo1;
+  Q.le_congr (Q.neg_sub_pack (Q.invS k) (Q.invS K))
+    (Q.refl ((f lim).seq k)) hlo3
+
+def R.Bracket.bound (f : R → R) (B : R.Bracket f) (hf : R.Continuous f) (K k : Nat) :
+    Q.abs ((f (R.Nested.lim B.nested)).seq k) ≤ Q.invS K + 3 * Q.invS k :=
+  Q.abs_le_of_bounds (R.Bracket.lower f B hf K k) (R.Bracket.upper f B hf K k)
+
+def R.Bracket.root (f : R → R) (B : R.Bracket f) (hf : R.Continuous f) :
+    R.Dist (f (R.Nested.lim B.nested)) 0 0 :=
+  R.dist_zero_of_three_invS (f (R.Nested.lim B.nested)) (fun k =>
+    Q.le_of_forall_le_add (Q.abs ((f (R.Nested.lim B.nested)).seq k)) (3 * Q.invS k) 1 (fun K =>
+      Q.le_congr (Q.refl (Q.abs ((f (R.Nested.lim B.nested)).seq k)))
+        (Q.trans (Q.add_comm (Q.invS K) (3 * Q.invS k))
+          (Q.add_congr (Q.refl (3 * Q.invS k)) (Q.symm (Q.one_mul (Q.invS K)))))
+        (R.Bracket.bound f B hf K k)))
+
+def R.dist_self (c : R) (e : Q) (he : 0 ≤ e) : R.Dist c c e := fun k =>
+  Q.le_trans (Q.le_of_eq (Q.trans (Q.abs_congr (Q.sub_self (c.seq k))) Q.abs_zero))
+    (Q.add_nonneg he (Q.add_nonneg (Q.invS_nonneg k) (Q.invS_nonneg k)))
+
+-- A constant function is continuous (any positive modulus works).
+def R.continuous_const (c : R) : R.Continuous (fun _ => c) :=
+  fun x e he => ((1 : Q), (rfl, fun y _ => R.dist_self c e (Q.le_of_lt he)))
+
+-- The intermediate value theorem in the form proved here: a continuous `f` whose
+-- bisection carries the sign certificate `R.Bracket` has a zero at the limit of the
+-- shrinking intervals. Constructing the certificate from `f(a) < 0 < f(b)` is the
+-- located sign test; see the note at `R.Bracket` and DESIGN.md/FINDINGS.md.
+def R.ivt_approx (f : R → R) (hf : R.Continuous f) (B : R.Bracket f) :
+    R.Dist (f (R.Nested.lim B.nested)) 0 0 := R.Bracket.root f B hf
+
+-- A constant sequence is regular.
+def R.regSeq_const (c : R) : R.RegSeq (fun _ => c) := fun m n =>
+  R.dist_self c (Q.invS m + Q.invS n)
+    (Q.add_nonneg (Q.invS_nonneg m) (Q.invS_nonneg n))
+

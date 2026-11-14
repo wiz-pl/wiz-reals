@@ -1,0 +1,59 @@
+-- test: check
+import Reals.Analysis
+-- distance algebra and completeness
+#check R.dist_symm
+#print axioms R.dist_symm
+#check R.dist_triangle
+#print axioms R.dist_triangle
+#check R.dist_neg
+#print axioms R.dist_neg
+#check R.dist_of_forall_add
+#print axioms R.dist_of_forall_add
+#check R.dist_zero_of_two_invS
+#print axioms R.dist_zero_of_two_invS
+#check R.eq_of_dist_two_invS
+#print axioms R.eq_of_dist_two_invS
+#check R.lim_dist
+#print axioms R.lim_dist
+#check R.lim_congr
+#print axioms R.lim_congr
+#check R.lim_unique
+#print axioms R.lim_unique
+-- shrinking intervals
+#check R.Nested
+#check R.Nested.lim
+#check R.Nested.lo_dist
+#print axioms R.Nested.lo_dist
+#check R.Nested.hi_dist
+#print axioms R.Nested.hi_dist
+-- the bisection root theorem
+#check R.Continuous
+#check R.Bracket
+#check R.Bracket.upper
+#print axioms R.Bracket.upper
+#check R.Bracket.lower
+#print axioms R.Bracket.lower
+#check R.Bracket.bound
+#print axioms R.Bracket.bound
+#check R.Bracket.root
+#print axioms R.Bracket.root
+#check R.ivt_approx
+#print axioms R.ivt_approx
+#check R.continuous_const
+#print axioms R.continuous_const
+
+-- A concrete (constant) bisection certificate, so the root theorem is exercised,
+-- not only `#check`ed.
+def zeroNested : R.Nested :=
+  R.Nested.mk (fun _ => (0 : R)) (fun _ => (0 : R)) (R.regSeq_const 0)
+    (fun n => R.dist_self 0 (Q.invS n) (Q.invS_nonneg n))
+    (fun m n h => R.dist_self 0 (Q.invS m) (Q.invS_nonneg m))
+
+def zeroBracket : R.Bracket (fun _ => (0 : R)) :=
+  R.Bracket.mk zeroNested
+    (fun n => R.dist_mono (R.lim_spec (fun _ => (0 : R)) (R.regSeq_const 0) n)
+      (Q.le_add_self (Q.invS n) (Q.invS n) (Q.invS_nonneg n)))
+    (fun n k => Q.le_trans (Q.le_of_eq (R.zero_seq k)) (Q.invS_nonneg k))
+    (fun n k => Q.le_trans (Q.neg_invS_le_zero k) (Q.le_of_eq (Q.symm (R.zero_seq k))))
+
+#check R.ivt_approx (fun _ => (0 : R)) (R.continuous_const 0) zeroBracket
