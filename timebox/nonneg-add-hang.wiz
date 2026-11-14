@@ -1,0 +1,27 @@
+-- Timeboxed repro: a failed/hanging typecheck in `R.nonneg_add`.
+--
+-- Exact command (from the worktree root):
+--   WIZ_LIGHT_SECS=180 /workspace/wiz-tools/light wiz check -I src timebox/nonneg-add-hang.wiz
+-- It does not finish in 180 s (the same module without the last definition checks).
+--
+-- The ingredients are the redesigned `R.NonNeg` (index `3n+2`, see RealOrder.wiz),
+-- `R.nonneg_seq` and `R.nonneg_add`. The two halves `hsum` and `e2` are checked in
+-- the real module; the final `Q.chain` is what never returns. `nonneg_add` is left
+-- out of `RealOrder.wiz` until this is understood.
+
+import Reals.RealOrder
+
+def R.nonneg_add_min {ω x y : R} (hx : R.NonNeg x) (hy : R.NonNeg y) (n : Nat) :
+    -(Q.invS n) ≤ x.seq (R.addIdx (R.nonnegIdx n)) + y.seq (R.addIdx (R.nonnegIdx n)) :=
+  let s := R.nonnegIdx n;
+  let a := R.addIdx s;
+  let hsum : -(Q.invS a + Q.invS a) ≤ x.seq a + y.seq a :=
+    Q.le_congr (Q.neg_add' (Q.invS a) (Q.invS a)) (Q.refl _)
+      (Q.add_le_add (R.nonneg_seq x hx a) (R.nonneg_seq y hy a));
+  let e2 : -(Q.invS s) ≈ -(Q.invS a + Q.invS a) :=
+    Q.neg_congr (Q.symm (Q.invS_double s));
+  Q.chain (-(Q.invS n)) (-(Q.invS s)) (x.seq a + y.seq a)
+    (Q.neg_le_neg (Q.invS_anti n s (Nat.le_nonnegIdx n)))
+    (Q.le_congr (Q.refl _) e2 hsum)
+
+#check R.nonneg_add_min

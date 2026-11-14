@@ -1,12 +1,29 @@
 import Reals.RealMul
--- Order on the reals. Positivity is *data*: a witness `n` with `1/(n+1) < xₙ` (a Σ in
--- `Type`), because an `∃` in `Prop` can't be eliminated into the index a computation
--- needs (DESIGN.md). `NonNeg` is a proposition: `-1/(n+1) ≤ xₙ` for every `n`.
+-- Order on the reals.
+--
+-- Positivity is *data*: a rational `c > 0` with `c - 1/(n+1) ≤ xₙ` for every `n`.
+-- That is Bishop's "eventually bounded below by a positive constant", kept as a
+-- witness in `Type` because an inverse needs its index (an `∃` in `Prop` cannot be
+-- eliminated into a computation; DESIGN.md). The `-1/(n+1)` slack makes the predicate
+-- invariant under `≈` and closed under `+`.
+--
+-- `NonNeg` reads its sequence at the later index `2n+1`: the pointwise version at `n`
+-- is not closed under addition, because `(x+y)` shifts the index and two one-sided
+-- bounds `-1/(n+1)` add up to `-2/(n+1)`. Half the slack is exactly what the double
+-- index buys back.
 
-def R.Pos (x : R) : Type := (n : Nat) × (Q.invS n < x.seq n)
-def R.NonNeg (x : R) : Prop := (n : Nat) → -(Q.invS n) ≤ x.seq n
+def R.nonnegIdx (n : Nat) : Nat := n + n + n + 2
+def R.Pos (x : R) : Type :=
+  (c : Q) × (0 < c) × ((n : Nat) → c - Q.invS n ≤ x.seq n)
+def R.NonNeg (x : R) : Prop := (n : Nat) → -(Q.invS n) ≤ x.seq (R.nonnegIdx n)
 def R.Lt (x y : R) : Type := R.Pos (y - x)
 def R.Le (x y : R) : Prop := R.NonNeg (y - x)
+
+def Nat.le_nonnegIdx (m : Nat) : Nat.Le m (R.nonnegIdx m) :=
+  Nat.le_trans m (m + m) (m + m + m + 2)
+    (Nat.le_add_right m m)
+    (Nat.le_trans (m + m) (m + m + m) (m + m + m + 2)
+      (Nat.le_add_right (m + m) m) (Nat.le_add_right (m + m + m) 2))
 
 -- `a - b ≤ S` gives `a - S ≤ b`
 def Q.sub_le_of_sub_le {ω a b S : Q} (h : a - b ≤ S) : a - S ≤ b :=
@@ -15,14 +32,27 @@ def Q.sub_le_of_sub_le {ω a b S : Q} (h : a - b ≤ S) : a - S ≤ b :=
 def R.lower (x : R) (n m : Nat) : x.seq n - (Q.invS n + Q.invS m) ≤ x.seq m :=
   Q.sub_le_of_sub_le (Q.le_trans (Q.le_abs (x.seq n - x.seq m)) (x.reg n m))
 
+def Q.neg_le_zero {ω p : Q} (h : 0 ≤ p) : -p ≤ 0 :=
+  Q.le_congr (Q.refl (-p)) (q_ring! -(0 : Q) ≈ 0) (Q.neg_le_neg h)
+def Q.neg_invS_le_zero (n : Nat) : -(Q.invS n) ≤ 0 := Q.neg_le_zero (Q.invS_nonneg n)
+-- `c - p ≤ c` when `p ≥ 0`
+def Q.sub_le_self {ω p : Q} (c : Q) (hp : 0 ≤ p) : c - p ≤ c :=
+  Q.le_congr (Q.symm (q_ring! c - p ≈ c + -p)) (Q.symm (q_ring! c ≈ c + -(0 : Q)))
+    (Q.add_le_add_left c (Q.neg_le_zero hp))
+-- `-p ≤ c - p` when `c ≥ 0`
+def Q.neg_le_sub_self {ω p : Q} (c : Q) (hc : 0 ≤ c) : -p ≤ c - p :=
+  Q.le_congr (Q.symm (q_ring! -p ≈ 0 + -p)) (Q.symm (q_ring! c - p ≈ c + -p))
+    (Q.add_le_add_right (-p) hc)
+
 -- a positive real is non-negative
-def R.nonneg_of_pos (x : R) (p : R.Pos x) : R.NonNeg x := fun m =>
-  let S := Q.invS p.1 + Q.invS m;
-  Q.chain _ (x.seq p.1 - S) _
-    (Q.chain _ (Q.invS p.1 - S) _
-      (Q.le_of_eq (q_ring! -(Q.invS m) ≈ Q.invS p.1 - (Q.invS p.1 + Q.invS m)))
-      (Q.add_le_add_right (-S) (Q.le_of_lt p.2)))
-    (R.lower x p.1 m)
+def R.nonneg_of_pos (x : R) (p : R.Pos x) : R.NonNeg x := fun n =>
+  let c := p.1;
+  let hc : 0 ≤ c := Q.le_of_lt p.2.1;
+  Q.chain (-(Q.invS n)) (c - Q.invS (R.nonnegIdx n)) (x.seq (R.nonnegIdx n))
+    (Q.chain (-(Q.invS n)) (c - Q.invS n) (c - Q.invS (R.nonnegIdx n))
+      (Q.neg_le_sub_self c hc)
+      (Q.add_le_add_left c (Q.neg_le_neg (Q.invS_anti n (R.nonnegIdx n) (Nat.le_nonnegIdx n)))))
+    (p.2.2 (R.nonnegIdx n))
 
 -- ## Archimedes: every real is below a natural number
 
@@ -30,14 +60,20 @@ def Q.sub_le_sub_left {ω x y : Q} (c : Q) (h : x ≤ y) : c - y ≤ c - x := Q.
 def R.archimedean (x : R) : (n : Nat) × R.Lt x (R.ofQ (Q.ofNat n)) :=
   let B := Q.ofNat (R.bnd x);
   let N := R.bnd x + 2;
-  -- (N - x) at 0 is N - x₁ ≥ (B + 2) - B = 2 > 1
-  let h2 : 2 ≤ Q.ofNat N + -(x.seq 1) :=
-    Q.chain _ ((B + 2) - x.seq 1) _
-      (Q.chain _ ((B + 2) - B) _ (Q.le_of_eq (q_ring! 2 ≈ B + 2 - B))
-        (Q.sub_le_sub_left (B + 2) (Q.le_of_abs_le (R.abs_le_bnd x 1))))
-      (Q.le_of_eq (Q.sub_congr (Q.symm (Q.ofNat_add2 (R.bnd x))) (Q.refl (x.seq 1))));
-  let h1 : Q.invS 0 < 2 := rfl;
-  (N, (0, @Q.lt_of_lt_of_le (Q.invS 0) 2 (Q.ofNat N + -(x.seq 1)) h1 h2))
+  -- `N - x` is at least `(B+2) - B = 2` at every index, so it is positive with witness 2
+  let e : 2 ≈ Q.ofNat N - B :=
+    Q.trans (q_ring! 2 ≈ (B + 2) - B)
+      (Q.sub_congr (Q.symm (Q.ofNat_add2 (R.bnd x))) (Q.refl B));
+  let htail : (n : Nat) → 2 - Q.invS n ≤ (R.ofQ (Q.ofNat N) - x).seq n := fun n =>
+    let a := R.addIdx n;
+    let hxn : x.seq a ≤ B := Q.le_of_abs_le (R.abs_le_bnd x a);
+    let hNB : 2 ≤ Q.ofNat N + -(x.seq a) :=
+      Q.chain 2 (Q.ofNat N - B) (Q.ofNat N + -(x.seq a))
+        (Q.le_of_eq e) (Q.sub_le_sub_left (Q.ofNat N) hxn);
+    Q.chain (2 - Q.invS n) 2 (Q.ofNat N + -(x.seq a))
+      (Q.sub_le_self 2 (Q.invS_nonneg n)) hNB;
+  let hc : 0 < (2 : Q) := rfl;
+  (N, (2, hc, htail))
 
 -- ## Absolute value
 
@@ -56,6 +92,118 @@ def Q.neg_lt_zero {ω p : Q} (h : 0 < p) : -p < -0 :=
   Q.lt_iff_mpr (Q.Pos.congr (q_ring! p - 0 ≈ -0 - -p) (Q.lt_iff_mp h))
 def R.abs (x : R) : R := R.mk (fun n => Q.abs (x.seq n)) (fun m n => Q.le_trans (Q.abs_abs_sub (x.seq m) (x.seq n)) (x.reg m n))
 def R.abs_nonneg (x : R) : R.NonNeg (R.abs x) := fun n =>
-  let h : -(Q.invS n) < 0 := Q.lt_congr (Q.refl (-(Q.invS n))) (q_ring! -(0 : Q) ≈ 0) (Q.neg_lt_zero (Q.invS_pos n));
-  Q.chain (-(Q.invS n)) 0 (Q.abs (x.seq n)) (Q.le_of_lt h) (Q.abs_nonneg (x.seq n))
+  Q.chain (-(Q.invS n)) 0 (Q.abs (x.seq (R.nonnegIdx n)))
+    (Q.neg_invS_le_zero n) (Q.abs_nonneg (x.seq (R.nonnegIdx n)))
 def R.abs_congr {ω x y : R} (h : x ≈ y) : R.abs x ≈ R.abs y := fun n => Q.le_trans (Q.abs_abs_sub (x.seq n) (y.seq n)) (h n)
+
+-- ## The order core
+
+def R.leIdx (n : Nat) : Nat := R.addIdx (R.nonnegIdx n)
+def R.le_at {ω x y : R} (h : R.Le x y) (n : Nat) :
+    -(Q.invS n) ≤ y.seq (R.leIdx n) - x.seq (R.leIdx n) := h n
+def R.le_refl (x : R) : R.Le x x := fun n =>
+  Q.le_congr (Q.refl _) (Q.symm (Q.sub_self (x.seq (R.leIdx n)))) (Q.neg_invS_le_zero n)
+
+
+def R.diff_lower (x : R) (n m : Nat) :
+    -(Q.invS n + Q.invS m) ≤ x.seq m - x.seq n :=
+  Q.le_congr (Q.refl _) (Q.symm (q_ring! x.seq m - x.seq n ≈ -(x.seq n - x.seq m)))
+    (Q.neg_le_neg (Q.sub_le_of_sub_le (R.lower x n m)))
+
+def Q.nonneg_sub_of_le {ω p q : Q} (h : p ≤ q) : 0 ≤ q - p :=
+  Q.le_of_nonneg (Q.le_iff_mp h)
+def Nat.le_leIdx (m : Nat) : Nat.Le m (R.leIdx m) :=
+  Nat.le_trans m (R.nonnegIdx m) (R.leIdx m)
+    (Nat.le_nonnegIdx m) (Nat.le_double_succ (R.nonnegIdx m))
+
+def Q.leSlack1 (a b m : Q) :
+    (-(a + b) + (-m + (-m + -(a + b)))) + 4 * m ≈ -2 * a + -2 * b + 2 * m :=
+  q_ring! (-(a + b) + (-m + (-m + -(a + b)))) + 4 * m ≈ -2 * a + -2 * b + 2 * m
+def Q.leSlack2 (a b m : Q) : -2 * a + -2 * b + 2 * m ≈ -2 * a + (2 * m + -2 * b) :=
+  Q.trans (Q.add_assoc (-2 * a) (-2 * b) (2 * m))
+    (Q.add_congr (Q.refl (-2 * a)) (Q.add_comm (-2 * b) (2 * m)))
+def Q.two_invS_le (m b : Nat) (h : Nat.Le m b) : 2 * Q.invS b ≤ 2 * Q.invS m :=
+  Q.mul_le_mul_of_nonneg_left 2 (Q.ofNat_nonneg 2) (Q.invS_anti m b h)
+def Q.invS_double_neg (n : Nat) : -2 * Q.invS (R.leIdx n) ≈ -(Q.invS (R.nonnegIdx n)) :=
+  Q.neg_congr (Q.trans (q_ring! 2 * Q.invS (R.leIdx n) ≈ Q.invS (R.leIdx n) + Q.invS (R.leIdx n))
+    (Q.invS_double (R.nonnegIdx n)))
+def Q.invS_half_le (n : Nat) : -(Q.invS n) ≤ -2 * Q.invS (R.leIdx n) :=
+  Q.le_congr (Q.refl _) (Q.symm (Q.invS_double_neg n))
+    (Q.neg_le_neg (Q.invS_anti n (R.nonnegIdx n) (Nat.le_nonnegIdx n)))
+def Q.sub_chain4 (a b c d e : Q) : (a - b) + ((b - c) + ((c - d) + (d - e))) ≈ a - e :=
+  q_ring! (a - b) + ((b - c) + ((c - d) + (d - e))) ≈ a - e
+
+def R.leStep {ω x y z : R} (h1 : R.Le x y) (h2 : R.Le y z) (n m : Nat) :
+    -(Q.invS n) ≤ z.seq (R.leIdx n) - x.seq (R.leIdx n) + 4 * Q.invS m :=
+  let a := R.leIdx n;
+  let b := R.leIdx m;
+  let lb := -(Q.invS a + Q.invS b);
+  let hz : lb ≤ z.seq a - z.seq b :=
+    Q.le_congr (Q.symm (Q.neg_congr (Q.add_comm (Q.invS a) (Q.invS b)))) (Q.refl _)
+      (R.diff_lower z b a);
+  let hx : lb ≤ x.seq b - x.seq a := R.diff_lower x a b;
+  let L := lb + (-(Q.invS m) + (-(Q.invS m) + lb));
+  let d := (z.seq a - z.seq b) + ((z.seq b - y.seq b) + ((y.seq b - x.seq b) + (x.seq b - x.seq a)));
+  let hL : L ≤ d :=
+    Q.add_le_add hz (Q.add_le_add (R.le_at h2 m) (Q.add_le_add (R.le_at h1 m) hx));
+  let eL : L + 4 * Q.invS m ≈ -2 * Q.invS a + (2 * Q.invS m + -2 * Q.invS b) :=
+    Q.trans (Q.leSlack1 (Q.invS a) (Q.invS b) (Q.invS m))
+      (Q.leSlack2 (Q.invS a) (Q.invS b) (Q.invS m));
+  let hcorr : 0 ≤ 2 * Q.invS m + -2 * Q.invS b :=
+    Q.nonneg_sub_of_le (Q.two_invS_le m b (Nat.le_leIdx m));
+  let hcorrAdd : -2 * Q.invS a + 0 ≤ -2 * Q.invS a + (2 * Q.invS m + -2 * Q.invS b) :=
+    Q.add_le_add_left (-2 * Q.invS a) hcorr;
+  let hstep : -2 * Q.invS a ≤ L + 4 * Q.invS m :=
+    Q.le_congr (q_ring! -2 * Q.invS a + 0 ≈ -2 * Q.invS a) (Q.symm eL) hcorrAdd;
+  let hd : d + 4 * Q.invS m ≈ z.seq a - x.seq a + 4 * Q.invS m :=
+    Q.add_congr (Q.sub_chain4 (z.seq a) (z.seq b) (y.seq b) (x.seq b) (x.seq a))
+      (Q.refl (4 * Q.invS m));
+  Q.chain (-(Q.invS n)) (-2 * Q.invS a) (z.seq a - x.seq a + 4 * Q.invS m)
+    (Q.invS_half_le n)
+    (Q.chain (-2 * Q.invS a) (L + 4 * Q.invS m) (z.seq a - x.seq a + 4 * Q.invS m)
+      hstep
+      (Q.chain (L + 4 * Q.invS m) (d + 4 * Q.invS m) (z.seq a - x.seq a + 4 * Q.invS m)
+        (Q.add_le_add_right (4 * Q.invS m) hL) (Q.le_of_eq hd)))
+
+def R.le_trans {ω x y z : R} (h1 : R.Le x y) (h2 : R.Le y z) : R.Le x z := fun n =>
+  Q.le_of_forall_le_add (-(Q.invS n)) ((z - x).seq (R.nonnegIdx n)) 4
+    (fun m => R.leStep h1 h2 n m)
+
+-- **The pointwise consequence.** From `NonNeg x` at all the shifted indices, regularity
+-- gives `xₚ ≥ -1/(p+1)` at every index.
+def R.nonneg_seq (x : R) (h : R.NonNeg x) (p : Nat) : -(Q.invS p) ≤ x.seq p :=
+  Q.le_of_forall_le_add (-(Q.invS p)) (x.seq p) 2 (fun m =>
+    let s := R.nonnegIdx m;
+    let hlow : -(Q.invS m) - (Q.invS s + Q.invS p) ≤ x.seq p :=
+      Q.chain (-(Q.invS m) - (Q.invS s + Q.invS p)) (x.seq s - (Q.invS s + Q.invS p)) (x.seq p)
+        (Q.add_le_add_right (-(Q.invS s + Q.invS p)) (h m)) (R.lower x s p);
+    let hnonneg : 0 ≤ Q.invS m - Q.invS s :=
+      Q.nonneg_sub_of_le (Q.invS_anti m s (Nat.le_nonnegIdx m));
+    let L := -(Q.invS m) - (Q.invS s + Q.invS p) + 2 * Q.invS m;
+    let hL : -(Q.invS p) ≤ L :=
+      Q.le_congr (q_ring! 0 + -(Q.invS p) ≈ -(Q.invS p))
+        (q_ring! (Q.invS m - Q.invS s) - Q.invS p
+          ≈ -(Q.invS m) - (Q.invS s + Q.invS p) + 2 * Q.invS m)
+        (Q.add_le_add_right (-(Q.invS p)) hnonneg);
+    Q.chain (-(Q.invS p)) L (x.seq p + 2 * Q.invS m)
+      hL (Q.add_le_add_right (2 * Q.invS m) hlow))
+
+
+def Q.neg_three (a : Q) : -a + -(a + a) ≈ -(3 * a) :=
+  q_ring! -a + -(a + a) ≈ -(3 * a)
+
+def R.nonneg_congr {ω p q : R} (h : p ≈ q) (hp : R.NonNeg p) : R.NonNeg q := fun n =>
+  let s := R.nonnegIdx n;
+  let hpq := h s;
+  let hneg : -(Q.invS s + Q.invS s) ≤ q.seq s - p.seq s :=
+    Q.le_congr (Q.refl _) (Q.symm (q_ring! q.seq s - p.seq s ≈ -(p.seq s - q.seq s)))
+      (Q.neg_le_neg (Q.le_of_abs_le hpq));
+  let e3 : -(3 * Q.invS s) ≈ -(Q.invS n) := Q.neg_congr (Q.invS_three n);
+  Q.chain (-(Q.invS n)) (-(3 * Q.invS s)) (q.seq s)
+    (Q.le_of_eq (Q.symm e3))
+    (Q.le_congr (Q.neg_three (Q.invS s)) (q_ring! p.seq s + (q.seq s - p.seq s) ≈ q.seq s)
+      (Q.add_le_add (R.nonneg_seq p hp s) hneg))
+
+
+def Q.neg_add' (a b : Q) : -(a + b) ≈ -a + -b := q_ring! -(a + b) ≈ -a + -b
+
