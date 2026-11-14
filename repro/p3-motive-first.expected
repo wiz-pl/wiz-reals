@@ -1,0 +1,4 @@
+repro/p3-motive-first.wiz:10:50: error: type mismatch
+  expected: ?m9 a b k e h a
+  inferred: Nat.Le a (b + k)
+  (a variable escapes the scope of the hole being solved)

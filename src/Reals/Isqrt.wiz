@@ -60,11 +60,11 @@ def Isqrt.step_spec (n f lo m hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi) (
   | .true, e =>
     ih m hi (e, (inv.2.1, (hm.2,
       Nat.le_trans hi (lo + Nat.succ f + 1) (m + f + 1) inv.2.2.2
-        (Eq.mpr' (fun (z : Nat) => Nat.Le z (m + f + 1)) (nat_ring! lo + Nat.succ f + 1 = Nat.succ lo + f + 1)
+        (Eq.mpr' (nat_ring! lo + Nat.succ f + 1 = Nat.succ lo + f + 1) (fun z => Nat.Le z (m + f + 1))
           (Nat.add_le_add_right 1 (Nat.succ lo + f) (m + f) (Nat.add_le_add_right f (Nat.succ lo) m hm.1))))))
   | .false, e =>
     ih lo m (inv.1, (Nat.not_le (m * m) n e, (hm.1,
-      Eq.mp' (fun (z : Nat) => Nat.Le (Nat.succ m) z) (nat_ring! lo + Nat.succ f + 1 = Nat.succ (lo + f + 1))
+      Eq.mp' (nat_ring! lo + Nat.succ f + 1 = Nat.succ (lo + f + 1)) (fun z => Nat.Le (Nat.succ m) z)
         (Nat.le_trans (Nat.succ m) hi (lo + Nat.succ f + 1) hm.2 inv.2.2.2))))
 def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
     (g : Nat → Nat → Nat) (ih : (lo' hi' : Nat) → Isqrt.Inv n f lo' hi' → Isqrt.Spec n (g lo' hi')) :
@@ -74,13 +74,13 @@ def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
     Isqrt.step_spec n f lo (Isqrt.mid lo hi) hi inv (Isqrt.mid_spec lo hi e) g ih _ rfl
   | .false, e =>
     let e' : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1 (Nat.le_of_not_lt (Nat.succ lo) hi e);
-    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e' inv.2.1)
+    (inv.1, Eq.mp' e' (fun z => Nat.Lt n (z * z)) inv.2.1)
 
 def Isqrt.go_spec (n : Nat) : (f lo hi : Nat) → Isqrt.Inv n f lo hi → Isqrt.Spec n (Isqrt.go n f lo hi)
   | .zero, lo, hi, inv =>
     let e : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1
-      (Eq.mp' (fun (z : Nat) => Nat.Le hi z) (nat_ring! lo + 0 + 1 = Nat.succ lo) inv.2.2.2);
-    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e inv.2.1)
+      (Eq.mp' (nat_ring! lo + 0 + 1 = Nat.succ lo) (fun z => Nat.Le hi z) inv.2.2.2);
+    (inv.1, Eq.mp' e (fun z => Nat.Lt n (z * z)) inv.2.1)
   | .succ f, lo, hi, inv =>
     let g := fun a b => Isqrt.go n f a b;
     let h : Isqrt.Spec n (Isqrt.body n g lo hi) :=

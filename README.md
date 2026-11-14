@@ -31,7 +31,7 @@ the intermediate value theorem.
 
 ## Building
 
-`wiz-toolchain` names the Wiz commit this is developed against (master `183f823`; it
+`wiz-toolchain` names the Wiz commit this is developed against (master `50cd3e7`; it
 has a release snapshot). With [tower](https://github.com/badly-drawn-wizards/wiz/blob/master/docs/stages/26-tower.md)
 on `PATH`, `wiz` and `grail` in this directory use it (`tower show`); the release ships
 its own C compiler and GMP.

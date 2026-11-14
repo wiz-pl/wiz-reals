@@ -15,10 +15,12 @@ def congrArg {A B : Type} (f : A → B) {a b : A} (e : a = b) : f a = f b :=
 def congrArg2 {A B C : Type} (f : A → B → C) {a a' : A} {b b' : B} (e : a = a') (e' : b = b') :
     f a b = f a' b' :=
   Eq.trans (Eq.congrArg (fun x => f x b) e) (Eq.congrArg (f a') e')
--- transport a proposition along an equation
-def Eq.mpr' {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P b) : P a :=
+-- transport a proposition along an equation.
+-- The equation comes before the motive: `A` is then known when the motive is
+-- elaborated, so a bare `fun x => …` works (FINDINGS.md, P3).
+def Eq.mpr' {A : Type} {a b : A} (e : a = b) (0 P : A → Prop) (h : P b) : P a :=
   Eq.substProp P (Eq.symm e) h
-def Eq.mp' {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
+def Eq.mp' {A : Type} {a b : A} (e : a = b) (0 P : A → Prop) (h : P a) : P b :=
   Eq.substProp P e h
 
 -- ## Addition
@@ -127,13 +129,13 @@ def Nat.le_add_right : (a k : Nat) → Nat.Le a (a + k)
   | .zero, _ => rfl
   | .succ a, k => Nat.le_add_right a k
 def Nat.le_add_left (a k : Nat) : Nat.Le a (k + a) :=
-  Eq.mp' (fun (x : Nat) => Nat.Le a x) (Nat.add_comm a k) (Nat.le_add_right a k)
+  Eq.mp' (Nat.add_comm a k) (fun x => Nat.Le a x) (Nat.le_add_right a k)
 def Nat.add_le_add_left : (k a b : Nat) → Nat.Le a b → Nat.Le (k + a) (k + b)
   | .zero, _, _, h => h
   | .succ k, a, b, h => Nat.add_le_add_left k a b h
 def Nat.add_le_add_right (k a b : Nat) (h : Nat.Le a b) : Nat.Le (a + k) (b + k) :=
-  Eq.mp' (fun (x : Nat) => Nat.Le x (b + k)) (Nat.add_comm k a)
-    (Eq.mp' (fun (x : Nat) => Nat.Le (k + a) x) (Nat.add_comm k b) (Nat.add_le_add_left k a b h))
+  Eq.mp' (Nat.add_comm k a) (fun x => Nat.Le x (b + k))
+    (Eq.mp' (Nat.add_comm k b) (fun x => Nat.Le (k + a) x) (Nat.add_le_add_left k a b h))
 def Nat.add_le_add (a b c d : Nat) (h : Nat.Le a b) (h' : Nat.Le c d) : Nat.Le (a + c) (b + d) :=
   Nat.le_trans (a + c) (b + c) (b + d) (Nat.add_le_add_right c a b h) (Nat.add_le_add_left b c d h')
 def Nat.pred_subFrom_succ : (a b : Nat) → Nat.pred (Nat.subFrom a (Nat.succ b)) = Nat.subFrom a b
@@ -157,17 +159,17 @@ def Nat.le_of_add_le_add_left : (k a b : Nat) → Nat.Le (k + a) (k + b) → Nat
   | .succ k, a, b, h => Nat.le_of_add_le_add_left k a b h
 def Nat.le_of_add_le_add_right (k a b : Nat) (h : Nat.Le (a + k) (b + k)) : Nat.Le a b :=
   Nat.le_of_add_le_add_left k a b
-    (Eq.mp' (fun (x : Nat) => Nat.Le x (k + b)) (Nat.add_comm a k)
-      (Eq.mp' (fun (x : Nat) => Nat.Le (a + k) x) (Nat.add_comm b k) h))
+    (Eq.mp' (Nat.add_comm a k) (fun x => Nat.Le x (k + b))
+      (Eq.mp' (Nat.add_comm b k) (fun x => Nat.Le (a + k) x) h))
 -- `a ≤ a + k` the other way round: `a ≤ b` iff `b = a + k` for some `k`
 def Nat.le_of_eq_add (a b k : Nat) (e : b = a + k) : Nat.Le a b :=
-  Eq.mpr' (fun (x : Nat) => Nat.Le a x) e (Nat.le_add_right a k)
+  Eq.mpr' e (fun x => Nat.Le a x) (Nat.le_add_right a k)
 def Nat.mul_le_mul_left : (k a b : Nat) → Nat.Le a b → Nat.Le (k * a) (k * b)
   | .zero, _, _, _ => rfl
   | .succ k, a, b, h => Nat.add_le_add a b (k * a) (k * b) h (Nat.mul_le_mul_left k a b h)
 def Nat.mul_le_mul_right (k a b : Nat) (h : Nat.Le a b) : Nat.Le (a * k) (b * k) :=
-  Eq.mp' (fun (x : Nat) => Nat.Le x (b * k)) (Nat.mul_comm k a)
-    (Eq.mp' (fun (x : Nat) => Nat.Le (k * a) x) (Nat.mul_comm k b) (Nat.mul_le_mul_left k a b h))
+  Eq.mp' (Nat.mul_comm k a) (fun x => Nat.Le x (b * k))
+    (Eq.mp' (Nat.mul_comm k b) (fun x => Nat.Le (k * a) x) (Nat.mul_le_mul_left k a b h))
 def Nat.mul_le_mul (a b c d : Nat) (h : Nat.Le a b) (h' : Nat.Le c d) : Nat.Le (a * c) (b * d) :=
   Nat.le_trans (a * c) (b * c) (b * d) (Nat.mul_le_mul_right c a b h) (Nat.mul_le_mul_left b c d h')
 -- positivity
