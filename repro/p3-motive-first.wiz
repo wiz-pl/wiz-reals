@@ -1,0 +1,10 @@
+-- test: check
+import Reals.Nat
+-- FINDINGS.md P3: with the motive before the equation, the motive's domain is still a
+-- hole when the lambda is elaborated, and a later argument forces the placeholder.
+-- (The library writes Eq.mp'/Eq.mpr' the other way round; tests/p3.wiz is the fixed
+-- statement.) The expected output is today's error.
+def Eq.mpMotiveFirst {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
+  Eq.substProp P e h
+def t (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
+  Eq.mpMotiveFirst (fun x => Nat.Le x (b + k)) e h

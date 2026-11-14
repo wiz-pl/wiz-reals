@@ -2,7 +2,7 @@
 
 What building the real numbers in Wiz showed about the language, its kernel, its
 elaborator, its tactics and its tooling, as of the toolchain in `wiz-toolchain`
-(master `183f823`, 2026-11-11). Each entry says what happened, a minimal reproducer,
+(master `50cd3e7`, 2026-11-12). Each entry says what happened, a minimal reproducer,
 and what this project does instead. Severity:
 
 * **bug**: wrong behaviour;
@@ -138,10 +138,39 @@ When `Key.insertB` fails to check, every later use reports
 makes `Nat.add_left_cancel k h` report `no field 'add_left_cancel' in a value of type
 Type` (the name falls back to field access on the type `Nat`).
 
-### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit
+### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit (fixed here)
 
-`Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "unification problem is outside the
-pattern fragment"; `fun (x : Nat) => …` works.
+`Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "a variable escapes the scope of
+the hole being solved" (an earlier toolchain reported "unification problem is outside
+the pattern fragment"). The same shape in a helper of its own:
+
+```
+import Reals.Nat
+def Eq.mpMotiveFirst {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
+  Eq.substProp P e h
+def t (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
+  Eq.mpMotiveFirst (fun x => Nat.Le x (b + k)) e h
+-- error: type mismatch  expected: ?m9 a b k e h a  inferred: Nat.Le a (b + k)
+--   (a variable escapes the scope of the hole being solved)
+```
+
+Root cause (Wiz `checkApp`): the motive lambda is postponed, because its binder's
+type is the hole `?A` (`postponable`/`unknownDomains`), but the later argument
+`h : P a` is elaborated in the same pass, before the postponed lambda. Its expected
+type `?P a` makes the unifier solve the placeholder `?P` from `h`'s type in the
+extended context (`?m9 a b k e h a`), and the solution mentions a variable outside
+the hole's scope. With the *equation* first, `?A` is solved from `e` before the
+motive is elaborated, so a bare lambda works.
+
+Here: `Eq.mp'`/`Eq.mpr'` take the equation before the motive, and every use writes a
+bare `fun x => …` (src/Reals/{Nat,Int,IntOrder,Isqrt,QLaws,QRing,QSeq,Sqrt2}.wiz).
+tests/p3.wiz is the finding's statement with the fixed proof;
+repro/p3-motive-first.wiz pins the error above, so the general elaborator issue stays
+visible and a fix in Wiz will show up as that test failing. Where the equation's type is
+itself a computed equation (at `Q`, a structure), the arguments stay explicit
+(`@Eq.mp' Q p q e …` in `Q.ofEq`): the equation first would have to unify the computed
+Σ with an equation whose sides are still holes. The general fix is to postpone an
+argument whose domain mentions a postponed placeholder.
 
 ### P4. Projections of an unsolved equation
 
@@ -150,11 +179,13 @@ pattern fragment"; `fun (x : Nat) => …` works.
 are solvable from its arguments, but `.1` is elaborated first. Here:
 `Bool.trueNeFalse (…)` (lib/Logic.wiz).
 
-### P5. No release snapshot of a recent master
+### P5. No release snapshot of the newest master
 
-Only one of the 30 newest master commits (183f823) had a release snapshot on
-2026-11-12, so `wiz-toolchain` can't name the newest master (9596a24): tower fails
-with a 404 and lists the retained snapshots. This project pins 183f823.
+Most of the newest master commits have no release snapshot, so `wiz-toolchain` cannot
+name them: tower fails with a 404 and lists the retained snapshots. `50cd3e7` is the
+newest commit with one on 2026-11-14 (the `wiz-cats` repository and the codex cross-check
+use the same commit). The project pinned `183f823` before this; that pin also had a
+snapshot, but is older than the fix that `wiz-cats` needs.
 
 ### P8. `|>` only pipes data
 
@@ -180,10 +211,11 @@ lemma whose type is the integer equation written out, proved by
 `congrArg Int.ofNat (nat_ring! …)`, then used at `≈` (src/Reals/Real.wiz
 `Q.ofNat_add2'`, src/Reals/Sqrt2.wiz `Sqrt2.err_eq'`).
 
-### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)`
+### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)` (fixed in wiz #202)
 
-`#check R.sqrt2_sq` prints `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`; at
-`Nat` and `Int` numerals print as numerals. (tests/sqrt2.expected)
+`#check R.sqrt2_sq` used to print `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`;
+at `Nat` and `Int` numerals already printed as numerals. At the pinned toolchain
+(`50cd3e7`, which has #202) it prints `≈ 2`, and tests/sqrt2.expected records that.
 
 ### P12. Partially applied recursive calls
 

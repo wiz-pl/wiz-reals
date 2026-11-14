@@ -57,12 +57,12 @@ def Int.ofPair_cases (a b : Nat) (0 P : Int → Prop)
   Or.elim (Bool.cases (Nat.le b a))
     (fun (h : Nat.le b a = .true) =>
       let e : b + (a - b) = a := Nat.sub_add_of_le b a h;
-      Eq.mpr' P (Eq.trans (congrArg (fun y => Int.ofPair y b) (Eq.symm e)) (Int.ofPair_nat b (a - b)))
+      Eq.mpr' (Eq.trans (congrArg (fun y => Int.ofPair y b) (Eq.symm e)) (Int.ofPair_nat b (a - b))) P
         (h1 (a - b) (Eq.symm e)))
     (fun (h : Nat.le b a = .false) =>
       let e : Nat.succ a + (b - Nat.succ a) = b := Nat.sub_add_of_le (Nat.succ a) b (Nat.not_le b a h);
       let e' : b = a + Nat.succ (b - Nat.succ a) := Eq.trans (Eq.symm e) (Eq.symm (Nat.add_succ a (b - Nat.succ a)));
-      Eq.mpr' P (Eq.trans (congrArg (fun y => Int.ofPair a y) e') (Int.ofPair_neg a (b - Nat.succ a)))
+      Eq.mpr' (Eq.trans (congrArg (fun y => Int.ofPair a y) e') (Int.ofPair_neg a (b - Nat.succ a))) P
         (h2 (b - Nat.succ a) e'))
 
 -- equal differences give equal integers
