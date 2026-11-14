@@ -12,6 +12,14 @@ and what this project does instead. Severity:
 * **slow**: correct but slow (timings are wall-clock under `light` on a shared
   machine: approximate, not measurements).
 
+## Status at the pinned toolchain (2026-11-14)
+
+`wiz-toolchain` names master `50cd3e7`. At that commit: **P3** is fixed here (`Eq.mp'`
+takes the equation before the motive, `tests/p3.wiz`); **P4** is reproduced with a
+minimal trigger (`repro/p4-proj-trans.wiz`) and worked around (`tests/p4.wiz`); **P5**
+is the pin itself (`50cd3e7` has a release snapshot); **P11** is fixed by wiz #202
+(`tests/sqrt2.expected` prints `≈ 2`). B2, P1, P2, P7, P10 and S2 are unchanged.
+
 ## Gaps
 
 ### G1. Tactics can't read an equation
@@ -172,12 +180,35 @@ itself a computed equation (at `Q`, a structure), the arguments stay explicit
 Σ with an equation whose sides are still holes. The general fix is to postpone an
 argument whose domain mentions a postponed placeholder.
 
-### P4. Projections of an unsolved equation
+### P4. Projections of an unsolved equation (reproduced; workaround)
 
-`absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1` reports
-`cannot project from a value of type ?m1 n h = ?m3 n h`; the implicits of `Eq.trans`
-are solvable from its arguments, but `.1` is elaborated first. Here:
-`Bool.trueNeFalse (…)` (lib/Logic.wiz).
+`absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1` reports `cannot project from a value
+of type ?m1 n h = ?m3 n h`: the implicits of `Eq.trans` are solvable from its arguments,
+but `.1` is elaborated first. The minimal trigger has no arithmetic in it — an equation
+of booleans (`repro/p4-proj-trans.wiz`, whose expected output is the error):
+
+```
+import Logic
+def t (b : Bool) (h : Bool.true = b) (k : b = Bool.false) : False :=
+  absurd (Eq.trans h k).1
+```
+
+Root cause (`Wiz/Elab/Term.lean`, `term.proj`): the projected term is *inferred* with no
+expected type, then the type is forced once and its head is matched against `Σ`. For
+`Eq.trans h k` the type at that moment is still the neutral equation `?m1 b h k = ?m3 b h k`
+(the application's implicit sides are not solved yet; `inferApp` returns the type value
+before it is zonked), so `elabProj` reports "cannot project" instead of seeing the Σ that
+an equation of booleans computes to. The same term *checked* against an expected type
+(elaborated by `checkApp`, which unifies the expected type with the application's type
+first) has its sides solved; storing the term in a `let` also works, because `elabLet`
+quotes the inferred type (`quote` zonks the spine) before the body is checked.
+
+Here: the equation is given as the expected type — an ascription (`(… : Bool.true =
+Bool.false)`, or a hole `: _`), or a lemma whose domain is that equation, which is what
+lib/Logic.wiz's `Bool.trueNeFalse` does (`Bool.trueNeFalse (Eq.trans (Eq.symm h) (Nat.lt_zero n))`,
+src/Reals/Nat.wiz `Nat.not_succ_le_zero`). tests/p4.wiz proves the finding's statements
+with each form; no statement is weakened. A fix in Wiz would be to zonk the inferred
+type (or solve the application's pending sides) before matching the head in `term.proj`.
 
 ### P5. No release snapshot of the newest master
 

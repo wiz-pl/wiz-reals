@@ -92,3 +92,15 @@ def Nat.lt_succ_mul_self (n : Nat) : Nat.Lt n (Nat.succ n * Nat.succ n) :=
 def Nat.isqrt_spec (n : Nat) : Isqrt.Spec n (Nat.isqrt n) :=
   Isqrt.go_spec n (Nat.succ n) 0 (Nat.succ n)
     (Nat.le_zero n, (Nat.lt_succ_mul_self n, (Nat.le_zero n, Nat.le_add_right (Nat.succ n) 1)))
+
+-- the integer square root is unique: any `r` with `r² ≤ n < (r+1)²` is `Nat.isqrt n`.
+-- (Both inequalities are strict comparisons of squares, so `Nat.lt_of_mul_self_lt`
+-- turns each bound into `r ≤ isqrt n` and `isqrt n ≤ r`.)
+def Nat.isqrt_unique (n r : Nat) (h : Isqrt.Spec n r) : r = Nat.isqrt n :=
+  Nat.le_antisymm r (Nat.isqrt n)
+    (Nat.lt_of_mul_self_lt r (Nat.succ (Nat.isqrt n))
+      (Nat.lt_of_le_of_lt (r * r) n (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) h.1
+        (Nat.isqrt_spec n).2))
+    (Nat.lt_of_mul_self_lt (Nat.isqrt n) (Nat.succ r)
+      (Nat.lt_of_le_of_lt (Nat.isqrt n * Nat.isqrt n) n (Nat.succ r * Nat.succ r)
+        (Nat.isqrt_spec n).1 h.2))

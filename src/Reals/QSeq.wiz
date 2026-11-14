@@ -14,6 +14,10 @@ def Int.ofNat_le (m n : Nat) (h : Nat.Le m n) : Int.Le (Int.ofNat m) (Int.ofNat 
 def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
   Int.Le.congr (int_ring! Int.ofNat (Nat.succ m) = 1 * Int.ofNat (Nat.succ m)) (int_ring! Int.ofNat (Nat.succ n) = 1 * Int.ofNat (Nat.succ n))
     (Int.ofNat_le (Nat.succ m) (Nat.succ n) h)
+-- the same with the larger index written `n + k`: the terms of a regular sequence are
+-- decreasing
+def Q.invS_le_add (n k : Nat) : Q.invS (n + k) ≤ Q.invS n :=
+  Q.invS_anti n (n + k) (Nat.le_add_right n k)
 def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.le_zero n)
 
 -- `(k + 1) · 1/(n+1)` in terms of the integers

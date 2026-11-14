@@ -19,12 +19,12 @@ reals are Bishop's regular sequences and how the algebra is automated.
 | `Reals.ZRing` | `int_ring!`: normalisation with integer coefficients |
 | `Reals.IntOrder` | the order of `Int`, `Int.abs` |
 | `Reals.Rat`, `Reals.QRing`, `Reals.QLaws` | `Q` (unreduced fractions, a setoid), `q_ring!`; ordered field: ring laws, congruences, order, `abs`, triangle inequality, inverse (`p * Q.inv p ≈ 1`), the archimedean property |
-| `Reals.QSeq` | `1/(n+1)`, and "below `b + k/(m+1)` for all `m` means below `b`" |
+| `Reals.QSeq` | `1/(n+1)` (decreasing: `Q.invS_le_add`), and "below `b + k/(m+1)` for all `m` means below `b`" |
 | `Reals.Real` | `R` (regular sequences), `≈` (an equivalence, by Bishop's criterion `R.eq_of_bound`), `+`, `-`, the additive group laws |
 | `Reals.RealMul` | `·` (Bishop's, through a bound of the factors), commutativity, associativity, `1`, distributivity, congruence |
 | `Reals.RealOrder` | positivity (as data), non-negativity, every real is below a natural number (`R.archimedean`), `|x|` |
 | `Reals.Complete` | distances; **completeness**: a regular sequence of reals converges to `R.lim` (`R.lim_spec`); continuity of `+` and `·` with explicit moduli (`R.add_dist`, `R.mul_dist`) |
-| `Reals.Isqrt`, `Reals.Sqrt2` | integer square root with its specification; `√2` as a real with `R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ 2`; digits `d/P` with `|(d/P)² - 2| ≤ 4/P` (`Sqrt2.approx_sq`) |
+| `Reals.Isqrt`, `Reals.Sqrt2` | integer square root with its specification and its uniqueness (`Nat.isqrt_unique`); `√2` as a real with `R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ 2`; digits `d/P` with `|(d/P)² - 2| ≤ 4/P` (`Sqrt2.approx_sq`) |
 
 Not done (see FINDINGS.md, "What is missing"): the inverse of a real apart from zero,
 the intermediate value theorem.

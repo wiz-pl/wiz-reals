@@ -1,0 +1,11 @@
+-- test: check
+import Reals.Isqrt
+import Reals.QSeq
+-- the integer square root is unique (`Isqrt` only gave existence)
+#check Nat.isqrt_unique
+#print axioms Nat.isqrt_unique
+-- a further term of the regular sequence is no larger
+#check Q.invS_le_add
+#print axioms Q.invS_le_add
+#eval Nat.isqrt 4
+#eval Nat.isqrt 15

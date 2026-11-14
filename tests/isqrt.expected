@@ -1,0 +1,6 @@
+tests/isqrt.wiz:5:1: info: Nat.isqrt_unique : (n : Nat) → (r : Nat) → Isqrt.Spec n r → r = Nat.isqrt n
+tests/isqrt.wiz:6:1: info: 'Nat.isqrt_unique' does not depend on any axioms
+tests/isqrt.wiz:8:1: info: Q.invS_le_add : (n : Nat) → (k : Nat) → Q.invS (n + k) ≤ Q.invS n
+tests/isqrt.wiz:9:1: info: 'Q.invS_le_add' does not depend on any axioms
+tests/isqrt.wiz:10:1: info: 2
+tests/isqrt.wiz:11:1: info: 3

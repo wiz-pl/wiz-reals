@@ -4,11 +4,7 @@ import Reals.Isqrt
 
 -- ## Facts about naturals
 
-def Nat.lt_of_mul_self_lt (p q : Nat) (h : Nat.Lt (p * p) (q * q)) : Nat.Lt p q :=
-  Or.elim (Bool.cases (Nat.le q p))
-    (fun (hle : Nat.le q p = .true) =>
-      absurd (Nat.lt_irrefl (p * p) (Nat.lt_of_lt_of_le (p * p) (q * q) (p * p) h (Nat.mul_le_mul q p q p hle hle))))
-    (fun (hf : Nat.le q p = .false) => Nat.not_le q p hf)
+-- (`Nat.lt_of_mul_self_lt` is in Nat.wiz: `Nat.isqrt_unique` uses it)
 
 -- ## The approximation `d/P` with `d = isqrt (2P²)`
 

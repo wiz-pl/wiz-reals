@@ -1,0 +1,6 @@
+tests/p4.wiz:13:1: info: p4 : (b : Bool) → .true = b → b = .false → False
+tests/p4.wiz:14:1: info: p4_nat : (n : Nat) → Nat.Le (.succ n) 0 → False
+tests/p4.wiz:15:1: info: p4_lem : (n : Nat) → Nat.Le (.succ n) 0 → False
+tests/p4.wiz:16:1: info: 'p4' does not depend on any axioms
+tests/p4.wiz:17:1: info: 'p4_nat' does not depend on any axioms
+tests/p4.wiz:18:1: info: 'p4_lem' does not depend on any axioms
