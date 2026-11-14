@@ -22,12 +22,14 @@ reals are Bishop's regular sequences and how the algebra is automated.
 | `Reals.QSeq` | `1/(n+1)` (decreasing: `Q.invS_le_add`), and "below `b + k/(m+1)` for all `m` means below `b`" |
 | `Reals.Real` | `R` (regular sequences), `≈` (an equivalence, by Bishop's criterion `R.eq_of_bound`), `+`, `-`, the additive group laws |
 | `Reals.RealMul` | `·` (Bishop's, through a bound of the factors), commutativity, associativity, `1`, distributivity, congruence |
-| `Reals.RealOrder` | positivity (as data), non-negativity, every real is below a natural number (`R.archimedean`), `|x|` |
+| `Reals.RealOrder` | positivity (a rational lower bound with a tail bound, as data), non-negativity at the shifted index `3n+2` (`R.NonNeg`), `R.le_refl`/`R.le_trans`, closure of `NonNeg` under `+` and `≈`, every real is below a natural number (`R.archimedean`), `|x|` |
 | `Reals.Complete` | distances; **completeness**: a regular sequence of reals converges to `R.lim` (`R.lim_spec`); continuity of `+` and `·` with explicit moduli (`R.add_dist`, `R.mul_dist`) |
-| `Reals.Isqrt`, `Reals.Sqrt2` | integer square root with its specification and its uniqueness (`Nat.isqrt_unique`); `√2` as a real with `R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ 2`; digits `d/P` with `|(d/P)² - 2| ≤ 4/P` (`Sqrt2.approx_sq`) |
+| `Reals.Isqrt`, `Reals.Sqrt2` | integer square root with its specification, the iff characterisation `Nat.isqrt_eq_iff`, `le_isqrt`, `isqrt_lt`, `sqrt_add_eq`, and uniqueness (`Nat.isqrt_unique`); `√2` as a real with `R.sqrt2_sq : R.sqrt2 * R.sqrt2 ≈ 2`; digits `d/P` with `|(d/P)² - 2| ≤ 4/P` (`Sqrt2.approx_sq`) |
 
-Not done (see FINDINGS.md, "What is missing"): the inverse of a real apart from zero,
-the intermediate value theorem.
+Not done (see FINDINGS.md, "What is missing"): the rest of the real order core
+(`add_le_add`, `le_antisymm`, `mul_le_mul`, `abs_triangle`, `le_of_forall_pos`,
+`lt_cotrans`), the inverse of a real apart from zero, and the intermediate value
+theorem. `timebox/order-deferred.md` records the two order attempts that were stopped.
 
 ## Building
 

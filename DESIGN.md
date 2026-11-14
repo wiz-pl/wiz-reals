@@ -39,9 +39,11 @@ A real number is a sequence `x : Nat → Q` with
   definitional and case splits use `Bool.cases`; the order on `Q` is decidable
   (`Q.le_or_lt`), which is what lets the archimedean lemma
   `Q.le_of_forall_le_add` be proved without classical logic.
-* **Positivity is data.** `R.Pos x := (n : Nat) × (1/(n+1) < xₙ)`, a Σ in `Type`
-  (Bishop's definition, with the witness kept), because inverses and comparisons
-  need the index. `R.NonNeg` is a proposition.
+* **Positivity is data.** `R.Pos x := (c : Q) × (0 < c) × ((n : Nat) → c - 1/(n+1) ≤ xₙ)`,
+  a Σ in `Type` (Bishop's eventual positive lower bound, with the witness kept),
+  because inverses and comparisons need the index and the bound. `R.NonNeg` is a
+  proposition read at the shifted index `3n+2`; the shift is what makes it stable
+  under `≈` and closed under `+` (see `src/Reals/RealOrder.wiz`).
 * **Distances instead of an order on reals in the analysis.** `R.Dist x y e`
   (`|xₖ - yₖ| ≤ e + 2/(k+1)` for all k) is Bishop's characterisation of
   `|x - y| ≤ e`. Completeness and continuity are stated with it, which keeps every

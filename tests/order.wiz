@@ -1,0 +1,21 @@
+-- test: check
+import Reals.RealOrder
+-- the order core that is proved: reflexivity, transitivity, non-negative addition
+#check R.le_refl
+#print axioms R.le_refl
+#check R.le_trans
+#print axioms R.le_trans
+#check R.nonneg_add
+#print axioms R.nonneg_add
+#check R.nonneg_congr
+#print axioms R.nonneg_congr
+#check R.nonneg_seq
+#print axioms R.nonneg_seq
+#check R.nonneg_of_pos
+#print axioms R.nonneg_of_pos
+#check R.abs_nonneg
+#print axioms R.abs_nonneg
+-- positivity is data: a rational lower bound with a tail bound
+#check R.Pos
+#check R.archimedean
+#print axioms R.archimedean

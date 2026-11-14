@@ -367,13 +367,27 @@ The cost of writing is dominated by S4: a wrong step is a timeout, not an error.
 
 ## What is missing
 
-* **The inverse of a real apart from zero** (Bishop's `x⁻¹` with `x_{N²(n+1)}`) and the
-  field law `x · x⁻¹ ≈ 1`. All the pieces exist (positivity as data, `Q.inv`, the
-  equality criterion); it is the same kind of index bookkeeping as `R.mul_assoc`.
+**P0 status (after this slice).** Closed: `Nat.isqrt_eq_iff` (and `le_isqrt`,
+`isqrt_lt`, `sqrt_add_eq`, `isqrt_mul_self`), `Q.invS_add_le`/`Q.invS_lt`, and the
+first part of the real order (`R.le_refl`, `R.le_trans`, `R.nonneg_seq`,
+`R.nonneg_congr`, `R.nonneg_add`, `R.nonneg_of_pos`, `R.abs_nonneg`). The new
+`R.Pos` is a uniform rational lower bound `c - 1/(n+1) ≤ xₙ`; `R.NonNeg` reads its
+sequence at `3n+2`, because the pointwise index made `NonNeg` neither stable under
+`≈` nor closed under `+` (two one-sided `-1/(n+1)` bounds add to `-2/(n+1)`).
+
+Deferred, with the timeboxed attempts in `timebox/order-deferred.md`:
+
+* **`R.add_le_add` and `R.le_antisymm`.** `R.Le` is `R.NonNeg (y - x)`, so the
+  index telescopes through `R.add`; the remaining step is an OTT equality of the
+  `Q` structure (a Σ), not the `Q.Eq` that `q_ring!`/`Q.ofEq` expect. Both proofs
+  were stopped at 180 s rather than left half-checking.
+* **`R.mul_le_mul`, `R.abs_triangle`, `R.le_of_forall_pos`, `R.lt_cotrans`**:
+  they depend on the two order lemmas above (or on the multiplication order).
+* **The inverse of a real apart from zero** and the field law `x · x⁻¹ ≈ 1`.
+  `R.Pos` now gives the uniform tail bound an inverse needs, so this is unblocked
+  in shape; the reciprocal sequence and its regularity are not written.
 * **The intermediate value theorem** (approximate form). Continuity is stated
   (`R.add_dist`, `R.mul_dist`) but not for general functions.
-* **The order on reals beyond the basics**: positivity, non-negativity, `R.archimedean`
-  and `|x|` are there; transitivity of `<` and compatibility with `+` and `·` are not.
 
 ## Not written in Wiz
 

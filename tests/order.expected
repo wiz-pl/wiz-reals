@@ -1,0 +1,17 @@
+tests/order.wiz:4:1: info: R.le_refl : (x : R) → R.Le x x
+tests/order.wiz:5:1: info: 'R.le_refl' does not depend on any axioms
+tests/order.wiz:6:1: info: R.le_trans : {ω x : R} → {ω y : R} → {ω z : R} → R.Le x y → R.Le y z → R.Le x z
+tests/order.wiz:7:1: info: 'R.le_trans' does not depend on any axioms
+tests/order.wiz:8:1: info: R.nonneg_add : {ω x : R} → {ω y : R} → R.NonNeg x → R.NonNeg y → R.NonNeg (x + y)
+tests/order.wiz:9:1: info: 'R.nonneg_add' does not depend on any axioms
+tests/order.wiz:10:1: info: R.nonneg_congr : {ω p : R} → {ω q : R} → p ≈ q → R.NonNeg p → R.NonNeg q
+tests/order.wiz:11:1: info: 'R.nonneg_congr' does not depend on any axioms
+tests/order.wiz:12:1: info: R.nonneg_seq : (x : R) → R.NonNeg x → (p : Nat) → -Q.invS p ≤ x.1 p
+tests/order.wiz:13:1: info: 'R.nonneg_seq' does not depend on any axioms
+tests/order.wiz:14:1: info: R.nonneg_of_pos : (x : R) → R.Pos x → R.NonNeg x
+tests/order.wiz:15:1: info: 'R.nonneg_of_pos' does not depend on any axioms
+tests/order.wiz:16:1: info: R.abs_nonneg : (x : R) → R.NonNeg (R.abs x)
+tests/order.wiz:17:1: info: 'R.abs_nonneg' does not depend on any axioms
+tests/order.wiz:19:1: info: R.Pos : R → Type
+tests/order.wiz:20:1: info: R.archimedean : (x : R) → (n : Nat) × R.Lt x (R.ofQ (Q.ofNat n))
+tests/order.wiz:21:1: info: 'R.archimedean' does not depend on any axioms
