@@ -1,0 +1,19 @@
+tests/isqrt.wiz:5:1: info: Nat.isqrt_eq_iff : (n : Nat) → (r : Nat) → (r = Nat.isqrt n ↔ Isqrt.Spec n r)
+tests/isqrt.wiz:6:1: info: 'Nat.isqrt_eq_iff' does not depend on any axioms
+tests/isqrt.wiz:7:1: info: Nat.isqrt_unique : (n : Nat) → (r : Nat) → Isqrt.Spec n r → r = Nat.isqrt n
+tests/isqrt.wiz:8:1: info: 'Nat.isqrt_unique' does not depend on any axioms
+tests/isqrt.wiz:9:1: info: Nat.le_isqrt : (m : Nat) → (n : Nat) → (Nat.Le m (Nat.isqrt n) ↔ Nat.Le (m * m) n)
+tests/isqrt.wiz:10:1: info: 'Nat.le_isqrt' does not depend on any axioms
+tests/isqrt.wiz:11:1: info: Nat.isqrt_lt : (n : Nat) → (m : Nat) → (Nat.Lt (Nat.isqrt n) m ↔ Nat.Lt n (m * m))
+tests/isqrt.wiz:12:1: info: 'Nat.isqrt_lt' does not depend on any axioms
+tests/isqrt.wiz:13:1: info: Nat.sqrt_add_eq : (n : Nat) → (k : Nat) → Nat.Le k (2 * n) → Nat.isqrt (n * n + k) = n
+tests/isqrt.wiz:14:1: info: 'Nat.sqrt_add_eq' does not depend on any axioms
+tests/isqrt.wiz:15:1: info: Nat.isqrt_mul_self : (n : Nat) → Nat.isqrt (n * n) = n
+tests/isqrt.wiz:16:1: info: 2
+tests/isqrt.wiz:17:1: info: 3
+tests/isqrt.wiz:18:1: info: 1000
+tests/isqrt.wiz:19:1: info: 999
+tests/isqrt.wiz:21:1: info: Q.invS_add_le : (m : Nat) → (n : Nat) → Q.invS (m + n) ≤ Q.invS m + Q.invS n
+tests/isqrt.wiz:22:1: info: 'Q.invS_add_le' does not depend on any axioms
+tests/isqrt.wiz:23:1: info: Q.invS_lt : (m : Nat) → (n : Nat) → Nat.Lt m n → Q.invS n < Q.invS m
+tests/isqrt.wiz:24:1: info: 'Q.invS_lt' does not depend on any axioms

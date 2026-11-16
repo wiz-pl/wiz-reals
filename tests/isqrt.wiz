@@ -1,0 +1,24 @@
+-- test: check
+import Reals.Isqrt
+import Reals.QSeq
+-- the integer square root is unique, as an iff and as the old one-way form
+#check Nat.isqrt_eq_iff
+#print axioms Nat.isqrt_eq_iff
+#check Nat.isqrt_unique
+#print axioms Nat.isqrt_unique
+#check Nat.le_isqrt
+#print axioms Nat.le_isqrt
+#check Nat.isqrt_lt
+#print axioms Nat.isqrt_lt
+#check Nat.sqrt_add_eq
+#print axioms Nat.sqrt_add_eq
+#check Nat.isqrt_mul_self
+#eval Nat.isqrt 4
+#eval Nat.isqrt 15
+#eval Nat.isqrt 1000000
+#eval Nat.isqrt 999999
+-- the `1/(m+n+1) ≤ 1/(m+1) + 1/(n+1)` algebra
+#check Q.invS_add_le
+#print axioms Q.invS_add_le
+#check Q.invS_lt
+#print axioms Q.invS_lt

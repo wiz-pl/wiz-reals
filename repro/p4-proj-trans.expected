@@ -1,0 +1,2 @@
+repro/p4-proj-trans.wiz:6:10: error: cannot project from a value of type ?m1 b h k = ?m3 b h k
+repro/p4-proj-trans.wiz:9:10: error: cannot project from a value of type ?m1 n h = ?m3 n h

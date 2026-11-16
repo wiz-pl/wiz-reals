@@ -60,11 +60,11 @@ def Isqrt.step_spec (n f lo m hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi) (
   | .true, e =>
     ih m hi (e, (inv.2.1, (hm.2,
       Nat.le_trans hi (lo + Nat.succ f + 1) (m + f + 1) inv.2.2.2
-        (Eq.mpr' (fun (z : Nat) => Nat.Le z (m + f + 1)) (nat_ring! lo + Nat.succ f + 1 = Nat.succ lo + f + 1)
+        (Eq.mpr' (nat_ring! lo + Nat.succ f + 1 = Nat.succ lo + f + 1) (fun z => Nat.Le z (m + f + 1))
           (Nat.add_le_add_right 1 (Nat.succ lo + f) (m + f) (Nat.add_le_add_right f (Nat.succ lo) m hm.1))))))
   | .false, e =>
     ih lo m (inv.1, (Nat.not_le (m * m) n e, (hm.1,
-      Eq.mp' (fun (z : Nat) => Nat.Le (Nat.succ m) z) (nat_ring! lo + Nat.succ f + 1 = Nat.succ (lo + f + 1))
+      Eq.mp' (nat_ring! lo + Nat.succ f + 1 = Nat.succ (lo + f + 1)) (fun z => Nat.Le (Nat.succ m) z)
         (Nat.le_trans (Nat.succ m) hi (lo + Nat.succ f + 1) hm.2 inv.2.2.2))))
 def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
     (g : Nat → Nat → Nat) (ih : (lo' hi' : Nat) → Isqrt.Inv n f lo' hi' → Isqrt.Spec n (g lo' hi')) :
@@ -74,13 +74,13 @@ def Isqrt.stop_spec (n f lo hi : Nat) (inv : Isqrt.Inv n (Nat.succ f) lo hi)
     Isqrt.step_spec n f lo (Isqrt.mid lo hi) hi inv (Isqrt.mid_spec lo hi e) g ih _ rfl
   | .false, e =>
     let e' : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1 (Nat.le_of_not_lt (Nat.succ lo) hi e);
-    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e' inv.2.1)
+    (inv.1, Eq.mp' e' (fun z => Nat.Lt n (z * z)) inv.2.1)
 
 def Isqrt.go_spec (n : Nat) : (f lo hi : Nat) → Isqrt.Inv n f lo hi → Isqrt.Spec n (Isqrt.go n f lo hi)
   | .zero, lo, hi, inv =>
     let e : hi = Nat.succ lo := Nat.eq_of_le_of_lt lo hi inv.2.2.1
-      (Eq.mp' (fun (z : Nat) => Nat.Le hi z) (nat_ring! lo + 0 + 1 = Nat.succ lo) inv.2.2.2);
-    (inv.1, Eq.mp' (fun (z : Nat) => Nat.Lt n (z * z)) e inv.2.1)
+      (Eq.mp' (nat_ring! lo + 0 + 1 = Nat.succ lo) (fun z => Nat.Le hi z) inv.2.2.2);
+    (inv.1, Eq.mp' e (fun z => Nat.Lt n (z * z)) inv.2.1)
   | .succ f, lo, hi, inv =>
     let g := fun a b => Isqrt.go n f a b;
     let h : Isqrt.Spec n (Isqrt.body n g lo hi) :=
@@ -92,3 +92,91 @@ def Nat.lt_succ_mul_self (n : Nat) : Nat.Lt n (Nat.succ n * Nat.succ n) :=
 def Nat.isqrt_spec (n : Nat) : Isqrt.Spec n (Nat.isqrt n) :=
   Isqrt.go_spec n (Nat.succ n) 0 (Nat.succ n)
     (Nat.le_zero n, (Nat.lt_succ_mul_self n, (Nat.le_zero n, Nat.le_add_right (Nat.succ n) 1)))
+
+-- **The characterisation**: `r` is the integer square root of `n` exactly when it
+-- satisfies the two inequalities. This is the iff form of `Nat.isqrt_unique`.
+def Nat.isqrt_eq_iff (n r : Nat) : (r = Nat.isqrt n) ↔ Isqrt.Spec n r :=
+  Iff.intro
+    (fun e => Eq.mp' (Eq.symm e) (fun x => Isqrt.Spec n x) (Nat.isqrt_spec n))
+    (fun h =>
+      Nat.le_antisymm r (Nat.isqrt n)
+        (Nat.lt_of_mul_self_lt r (Nat.succ (Nat.isqrt n))
+          (Nat.lt_of_le_of_lt (r * r) n (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) h.1
+            (Nat.isqrt_spec n).2))
+        (Nat.lt_of_mul_self_lt (Nat.isqrt n) (Nat.succ r)
+          (Nat.lt_of_le_of_lt (Nat.isqrt n * Nat.isqrt n) n (Nat.succ r * Nat.succ r)
+            (Nat.isqrt_spec n).1 h.2)))
+
+-- `m ≤ isqrt n` exactly when `m² ≤ n`.
+def Nat.le_isqrt (m n : Nat) : Nat.Le m (Nat.isqrt n) ↔ Nat.Le (m * m) n :=
+  Iff.intro
+    (fun h => Nat.le_trans (m * m) (Nat.isqrt n * Nat.isqrt n) n
+      (Nat.mul_le_mul m (Nat.isqrt n) m (Nat.isqrt n) h h)
+      (Nat.isqrt_spec n).1)
+    (fun h => Or.elim (Bool.cases (Nat.le m (Nat.isqrt n)))
+      (fun (hb : Nat.le m (Nat.isqrt n) = .true) => hb)
+      (fun (hb : Nat.le m (Nat.isqrt n) = .false) =>
+        let hlt : Nat.Le (Nat.succ (Nat.isqrt n)) m := Nat.not_le m (Nat.isqrt n) hb;
+        let hsq : Nat.Le (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) (m * m) :=
+          Nat.mul_le_mul (Nat.succ (Nat.isqrt n)) m (Nat.succ (Nat.isqrt n)) m hlt hlt;
+        absurd (Nat.lt_irrefl n
+          (Nat.lt_of_lt_of_le n (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) n
+            (Nat.isqrt_spec n).2 (Nat.le_trans (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) (m * m) n hsq h)))))
+
+-- `isqrt n < m` exactly when `n < m²`.
+def Nat.isqrt_lt (n m : Nat) : Nat.Lt (Nat.isqrt n) m ↔ Nat.Lt n (m * m) :=
+  Iff.intro
+    (fun h => Nat.lt_of_lt_of_le n (Nat.succ (Nat.isqrt n) * Nat.succ (Nat.isqrt n)) (m * m)
+      (Nat.isqrt_spec n).2
+      (Nat.mul_le_mul (Nat.succ (Nat.isqrt n)) m (Nat.succ (Nat.isqrt n)) m h h))
+    (fun h => Or.elim (Bool.cases (Nat.le m (Nat.isqrt n)))
+      (fun (hb : Nat.le m (Nat.isqrt n) = .true) =>
+        absurd (Nat.lt_irrefl n
+          (Nat.lt_of_lt_of_le n (m * m) n h
+            (Nat.le_trans (m * m) (Nat.isqrt n * Nat.isqrt n) n
+              (Nat.mul_le_mul m (Nat.isqrt n) m (Nat.isqrt n) hb hb)
+              (Nat.isqrt_spec n).1))))
+      (fun (hb : Nat.le m (Nat.isqrt n) = .false) => Nat.not_le m (Nat.isqrt n) hb))
+
+def Nat.sq_succ_add (n : Nat) : (n * n + 2 * n) + 1 = Nat.succ n * Nat.succ n :=
+  nat_ring! (n * n + 2 * n) + 1 = Nat.succ n * Nat.succ n
+def Nat.succ_mul_self_eq (n : Nat) : Nat.succ n * Nat.succ n = Nat.succ n + n * Nat.succ n :=
+  nat_ring! Nat.succ n * Nat.succ n = Nat.succ n + n * Nat.succ n
+
+-- `r² ≤ n` gives `r ≤ n` (contrapositive: `n < r` means `n + 1 ≤ r`, so `(n+1)² ≤ r²`).
+def Nat.le_of_mul_le_self (r n : Nat) (h : Nat.Le (r * r) n) : Nat.Le r n :=
+  Or.elim (Bool.cases (Nat.le r n))
+    (fun (hb : Nat.le r n = .true) => hb)
+    (fun (hf : Nat.le r n = .false) =>
+      let hlt : Nat.Le (Nat.succ n) r := Nat.not_le r n hf;
+      let hsq : Nat.Le (Nat.succ n * Nat.succ n) (r * r) :=
+        Nat.mul_le_mul (Nat.succ n) r (Nat.succ n) r hlt hlt;
+      absurd (Nat.lt_irrefl n
+        (Nat.lt_of_lt_of_le n (Nat.succ n * Nat.succ n) n (Nat.lt_succ_mul_self n)
+          (Nat.le_trans (Nat.succ n * Nat.succ n) (r * r) n hsq h))))
+
+-- `isqrt n ≤ n` (it is `0` at `0` and strictly below `n` from `2` on).
+def Nat.isqrt_le (n : Nat) : Nat.Le (Nat.isqrt n) n :=
+  Nat.le_of_mul_le_self (Nat.isqrt n) n (Nat.isqrt_spec n).1
+
+-- `isqrt (n² + k) = n` for `k ≤ 2n` (mathlib's `Nat.sqrt_add_eq`).
+def Nat.sqrt_add_eq (n k : Nat) (h : Nat.Le k (2 * n)) : Nat.isqrt (n * n + k) = n :=
+  let s := n * n + k;
+  let hle : Nat.Le s (n * n + 2 * n) := Nat.add_le_add_left (n * n) k (2 * n) h;
+  let hlt : Nat.Lt s (Nat.succ n * Nat.succ n) :=
+    Eq.mp' (Nat.sq_succ_add n) (fun z => Nat.Le (Nat.succ s) z)
+      (Eq.mpr' (Eq.symm (Nat.add_one s)) (fun z => Nat.Le z ((n * n + 2 * n) + 1))
+        (Nat.add_le_add_right 1 s (n * n + 2 * n) hle));
+  Eq.symm (Iff.mpr (Nat.isqrt_eq_iff (n * n + k) n)
+    (Nat.le_add_right (n * n) k, hlt))
+
+-- `isqrt (n²) = n`.
+def Nat.isqrt_mul_self (n : Nat) : Nat.isqrt (n * n) = n :=
+  Eq.mp' (Nat.add_zero (n * n)) (fun z => Nat.isqrt z = n)
+    (Nat.sqrt_add_eq n 0 (Nat.le_zero (2 * n)))
+
+-- the integer square root is unique: any `r` with `r² ≤ n < (r+1)²` is `Nat.isqrt n`.
+-- (Both inequalities are strict comparisons of squares, so `Nat.lt_of_mul_self_lt`
+-- turns each bound into `r ≤ isqrt n` and `isqrt n ≤ r`.)
+def Nat.isqrt_unique (n r : Nat) (h : Isqrt.Spec n r) : r = Nat.isqrt n :=
+  Iff.mpr (Nat.isqrt_eq_iff n r) h

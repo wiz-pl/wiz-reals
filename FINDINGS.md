@@ -2,7 +2,7 @@
 
 What building the real numbers in Wiz showed about the language, its kernel, its
 elaborator, its tactics and its tooling, as of the toolchain in `wiz-toolchain`
-(master `183f823`, 2026-11-11). Each entry says what happened, a minimal reproducer,
+(master `50cd3e7`, 2026-11-12). Each entry says what happened, a minimal reproducer,
 and what this project does instead. Severity:
 
 * **bug**: wrong behaviour;
@@ -11,6 +11,14 @@ and what this project does instead. Severity:
 * **papercut**: works, but costs time;
 * **slow**: correct but slow (timings are wall-clock under `light` on a shared
   machine: approximate, not measurements).
+
+## Status at the pinned toolchain (2026-11-14)
+
+`wiz-toolchain` names master `50cd3e7`. At that commit: **P3** is fixed here (`Eq.mp'`
+takes the equation before the motive, `tests/p3.wiz`); **P4** is reproduced with a
+minimal trigger (`repro/p4-proj-trans.wiz`) and worked around (`tests/p4.wiz`); **P5**
+is the pin itself (`50cd3e7` has a release snapshot); **P11** is fixed by wiz #202
+(`tests/sqrt2.expected` prints `≈ 2`). B2, P1, P2, P7, P10 and S2 are unchanged.
 
 ## Gaps
 
@@ -138,23 +146,77 @@ When `Key.insertB` fails to check, every later use reports
 makes `Nat.add_left_cancel k h` report `no field 'add_left_cancel' in a value of type
 Type` (the name falls back to field access on the type `Nat`).
 
-### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit
+### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit (fixed here)
 
-`Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "unification problem is outside the
-pattern fragment"; `fun (x : Nat) => …` works.
+`Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "a variable escapes the scope of
+the hole being solved" (an earlier toolchain reported "unification problem is outside
+the pattern fragment"). The same shape in a helper of its own:
 
-### P4. Projections of an unsolved equation
+```
+import Reals.Nat
+def Eq.mpMotiveFirst {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
+  Eq.substProp P e h
+def t (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
+  Eq.mpMotiveFirst (fun x => Nat.Le x (b + k)) e h
+-- error: type mismatch  expected: ?m9 a b k e h a  inferred: Nat.Le a (b + k)
+--   (a variable escapes the scope of the hole being solved)
+```
 
-`absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1` reports
-`cannot project from a value of type ?m1 n h = ?m3 n h`; the implicits of `Eq.trans`
-are solvable from its arguments, but `.1` is elaborated first. Here:
-`Bool.trueNeFalse (…)` (lib/Logic.wiz).
+Root cause (Wiz `checkApp`): the motive lambda is postponed, because its binder's
+type is the hole `?A` (`postponable`/`unknownDomains`), but the later argument
+`h : P a` is elaborated in the same pass, before the postponed lambda. Its expected
+type `?P a` makes the unifier solve the placeholder `?P` from `h`'s type in the
+extended context (`?m9 a b k e h a`), and the solution mentions a variable outside
+the hole's scope. With the *equation* first, `?A` is solved from `e` before the
+motive is elaborated, so a bare lambda works.
 
-### P5. No release snapshot of a recent master
+Here: `Eq.mp'`/`Eq.mpr'` take the equation before the motive, and every use writes a
+bare `fun x => …` (src/Reals/{Nat,Int,IntOrder,Isqrt,QLaws,QRing,QSeq,Sqrt2}.wiz).
+tests/p3.wiz is the finding's statement with the fixed proof;
+repro/p3-motive-first.wiz pins the error above, so the general elaborator issue stays
+visible and a fix in Wiz will show up as that test failing. Where the equation's type is
+itself a computed equation (at `Q`, a structure), the arguments stay explicit
+(`@Eq.mp' Q p q e …` in `Q.ofEq`): the equation first would have to unify the computed
+Σ with an equation whose sides are still holes. The general fix is to postpone an
+argument whose domain mentions a postponed placeholder.
 
-Only one of the 30 newest master commits (183f823) had a release snapshot on
-2026-11-12, so `wiz-toolchain` can't name the newest master (9596a24): tower fails
-with a 404 and lists the retained snapshots. This project pins 183f823.
+### P4. Projections of an unsolved equation (reproduced; workaround)
+
+`absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1` reports `cannot project from a value
+of type ?m1 n h = ?m3 n h`: the implicits of `Eq.trans` are solvable from its arguments,
+but `.1` is elaborated first. The minimal trigger has no arithmetic in it — an equation
+of booleans (`repro/p4-proj-trans.wiz`, whose expected output is the error):
+
+```
+import Logic
+def t (b : Bool) (h : Bool.true = b) (k : b = Bool.false) : False :=
+  absurd (Eq.trans h k).1
+```
+
+Root cause (`Wiz/Elab/Term.lean`, `term.proj`): the projected term is *inferred* with no
+expected type, then the type is forced once and its head is matched against `Σ`. For
+`Eq.trans h k` the type at that moment is still the neutral equation `?m1 b h k = ?m3 b h k`
+(the application's implicit sides are not solved yet; `inferApp` returns the type value
+before it is zonked), so `elabProj` reports "cannot project" instead of seeing the Σ that
+an equation of booleans computes to. The same term *checked* against an expected type
+(elaborated by `checkApp`, which unifies the expected type with the application's type
+first) has its sides solved; storing the term in a `let` also works, because `elabLet`
+quotes the inferred type (`quote` zonks the spine) before the body is checked.
+
+Here: the equation is given as the expected type — an ascription (`(… : Bool.true =
+Bool.false)`, or a hole `: _`), or a lemma whose domain is that equation, which is what
+lib/Logic.wiz's `Bool.trueNeFalse` does (`Bool.trueNeFalse (Eq.trans (Eq.symm h) (Nat.lt_zero n))`,
+src/Reals/Nat.wiz `Nat.not_succ_le_zero`). tests/p4.wiz proves the finding's statements
+with each form; no statement is weakened. A fix in Wiz would be to zonk the inferred
+type (or solve the application's pending sides) before matching the head in `term.proj`.
+
+### P5. No release snapshot of the newest master
+
+Most of the newest master commits have no release snapshot, so `wiz-toolchain` cannot
+name them: tower fails with a 404 and lists the retained snapshots. `50cd3e7` is the
+newest commit with one on 2026-11-14 (the `wiz-cats` repository and the codex cross-check
+use the same commit). The project pinned `183f823` before this; that pin also had a
+snapshot, but is older than the fix that `wiz-cats` needs.
 
 ### P8. `|>` only pipes data
 
@@ -180,10 +242,11 @@ lemma whose type is the integer equation written out, proved by
 `congrArg Int.ofNat (nat_ring! …)`, then used at `≈` (src/Reals/Real.wiz
 `Q.ofNat_add2'`, src/Reals/Sqrt2.wiz `Sqrt2.err_eq'`).
 
-### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)`
+### P11. Numerals print as `OfNat.ofNat R 2 (instOfNatRN 2)` (fixed in wiz #202)
 
-`#check R.sqrt2_sq` prints `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`; at
-`Nat` and `Int` numerals print as numerals. (tests/sqrt2.expected)
+`#check R.sqrt2_sq` used to print `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`;
+at `Nat` and `Int` numerals already printed as numerals. At the pinned toolchain
+(`50cd3e7`, which has #202) it prints `≈ 2`, and tests/sqrt2.expected records that.
 
 ### P12. Partially applied recursive calls
 
@@ -191,6 +254,25 @@ In a definition by equations with a parameter before the colon,
 `Isqrt.step … (Isqrt.go n f) …` (the recursive function applied to the parameter and
 the structural argument only) is rejected: "recursive call of Isqrt.go on n, which is
 not a recursive field". Eta-expanding, `(fun a b => Isqrt.go n f a b)`, works.
+
+### P13. A projected structured field in a large expected type does not elaborate
+
+While proving the upper and lower endpoint bounds for `R.ivt_approx`, the same
+proof finished in seconds with the width as a *hypothesis* but timed out under
+`light` when the width came from the structure field:
+
+```wiz
+def t (N : R.Nested) (n : Nat) (hw : R.Dist (N.hi n) (N.lo n) (Q.invS n)) : … := …
+-- `hw` is fine; `N.width n` at the same place is not (180 s, no error)
+```
+
+`R.Nested.width : (n : Nat) → R.Dist (lo n) (hi n) (Q.invS n)` mentions the
+structure's other fields, and matching its result against an expected
+`R.Dist (N.hi n) (R.Nested.lim N) …` appears to unfold the structure instead of
+projecting it. Here: `R.Bracket` carries `hi_close` as its own field, so the
+lower-endpoint proof projects a plain hypothesis, and `R.Nested.hi_dist` is used
+only where the expected type is small. A minimal standalone reproducer would be
+useful; the workaround is cheap and keeps every proof checked.
 
 ## Slowness
 
@@ -304,13 +386,41 @@ The cost of writing is dominated by S4: a wrong step is a timeout, not an error.
 
 ## What is missing
 
-* **The inverse of a real apart from zero** (Bishop's `x⁻¹` with `x_{N²(n+1)}`) and the
-  field law `x · x⁻¹ ≈ 1`. All the pieces exist (positivity as data, `Q.inv`, the
-  equality criterion); it is the same kind of index bookkeeping as `R.mul_assoc`.
-* **The intermediate value theorem** (approximate form). Continuity is stated
-  (`R.add_dist`, `R.mul_dist`) but not for general functions.
-* **The order on reals beyond the basics**: positivity, non-negativity, `R.archimedean`
-  and `|x|` are there; transitivity of `<` and compatibility with `+` and `·` are not.
+**P0 status (after this slice).** Closed: `Nat.isqrt_eq_iff` (and `le_isqrt`,
+`isqrt_lt`, `sqrt_add_eq`, `isqrt_mul_self`), `Q.invS_add_le`/`Q.invS_lt`, and the
+first part of the real order (`R.le_refl`, `R.le_trans`, `R.nonneg_seq`,
+`R.nonneg_congr`, `R.nonneg_add`, `R.nonneg_of_pos`, `R.abs_nonneg`). The new
+`R.Pos` is a uniform rational lower bound `c - 1/(n+1) ≤ xₙ`; `R.NonNeg` reads its
+sequence at `3n+2`, because the pointwise index made `NonNeg` neither stable under
+`≈` nor closed under `+` (two one-sided `-1/(n+1)` bounds add to `-2/(n+1)`).
+
+Deferred, with the timeboxed attempts in `timebox/order-deferred.md`:
+
+* **`R.add_le_add` and `R.le_antisymm`.** `R.Le` is `R.NonNeg (y - x)`, so the
+  index telescopes through `R.add`; the remaining step is an OTT equality of the
+  `Q` structure (a Σ), not the `Q.Eq` that `q_ring!`/`Q.ofEq` expect. Both proofs
+  were stopped at 180 s rather than left half-checking.
+* **`R.mul_le_mul`, `R.abs_triangle`, `R.le_of_forall_pos`, `R.lt_cotrans`**:
+  they depend on the two order lemmas above (or on the multiplication order).
+* **The inverse of a real apart from zero** and the field law `x · x⁻¹ ≈ 1`.
+  `R.Pos` now gives the uniform tail bound an inverse needs, so this is unblocked
+  in shape; the reciprocal sequence and its regularity are not written.
+* **Constructing the IVT bisection certificate.** `Reals.Analysis` proves the
+  analysis half: `R.lim_congr`, `R.lim_unique`, the nested-interval API
+  (`R.Nested`), and `R.ivt_approx`: if a continuous `f` comes with an `R.Bracket`
+  whose lower endpoints satisfy `f(loₙ)ₖ ≤ 1/(k+1)`, whose upper endpoints satisfy
+  `-1/(k+1) ≤ f(hiₙ)ₖ`, and whose upper endpoints stay within `2/(n+1)` of the
+  limit, then `f` is zero at `R.Nested.lim`. What is *not* written is the
+  construction of that bracket from `R.Lt (f a) 0` and `R.Lt 0 (f b)`. That step is
+  the located sign test: at each midpoint it decides `f(mid) ≤ 0` or `0 ≤ f(mid)`.
+  `R.Le`/`R.Lt` are not total (DESIGN.md), so this needs either a sign oracle or
+  Bishop's approximate-sign bookkeeping (compare a rational approximation and keep
+  a slack); it is the constructive/classical boundary, not a missing algebra lemma.
+  The theorem is stated with `R.Dist`, so no `add_le_add`/`le_antisymm` was needed.
+  `R.Nested` stores the width as `R.Dist (lo n) (hi n) (1/(n+1))`; the sign
+  certificate `R.Bracket` also carries `hi_close`, the distance from `hi n` to the
+  limit, because elaborating the field projection `R.Nested.width` at a large
+  expected type did not finish (P13).
 
 ## Not written in Wiz
 

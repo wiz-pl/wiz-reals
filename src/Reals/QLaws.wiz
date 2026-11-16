@@ -22,7 +22,7 @@ def Q.trans {ω p q r : Q} (h1 : p ≈ q) (h2 : q ≈ r) : p ≈ r :=
           (Eq.via (p.den * (r.num * q.den)) (congrArg (fun z => p.den * z) h2)
             (int_ring! p.den * (r.num * q.den) = q.den * (r.num * p.den))))))
 -- an equation of rationals is one of `≈`
-def Q.ofEq {ω p q : Q} (e : p = q) : p ≈ q := Eq.mp' (fun (x : Q) => p ≈ x) e (Q.refl p)
+def Q.ofEq {ω p q : Q} (e : p = q) : p ≈ q := @Eq.mp' Q p q e (fun x => p ≈ x) (Q.refl p)
 
 -- ## The operations respect `≈`
 

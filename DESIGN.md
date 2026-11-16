@@ -39,9 +39,11 @@ A real number is a sequence `x : Nat → Q` with
   definitional and case splits use `Bool.cases`; the order on `Q` is decidable
   (`Q.le_or_lt`), which is what lets the archimedean lemma
   `Q.le_of_forall_le_add` be proved without classical logic.
-* **Positivity is data.** `R.Pos x := (n : Nat) × (1/(n+1) < xₙ)`, a Σ in `Type`
-  (Bishop's definition, with the witness kept), because inverses and comparisons
-  need the index. `R.NonNeg` is a proposition.
+* **Positivity is data.** `R.Pos x := (c : Q) × (0 < c) × ((n : Nat) → c - 1/(n+1) ≤ xₙ)`,
+  a Σ in `Type` (Bishop's eventual positive lower bound, with the witness kept),
+  because inverses and comparisons need the index and the bound. `R.NonNeg` is a
+  proposition read at the shifted index `3n+2`; the shift is what makes it stable
+  under `≈` and closed under `+` (see `src/Reals/RealOrder.wiz`).
 * **Distances instead of an order on reals in the analysis.** `R.Dist x y e`
   (`|xₖ - yₖ| ≤ e + 2/(k+1)` for all k) is Bishop's characterisation of
   `|x - y| ≤ e`. Completeness and continuity are stated with it, which keeps every
@@ -52,6 +54,36 @@ if `|xₙ - yₙ| ≤ K/(n+1)` for some constant K, then `x ≈ y`. Every algebr
 the reals (associativity, distributivity, `√2·√2 = 2`) is proved by bounding the
 distance of the two sequences at the same index by such a K, using regularity and
 `1/(i+1) ≤ 1/(n+1)` for the larger indices that `+` and `·` use.
+
+## The analysis layer, and where the IVT is allowed to use choice
+
+`Reals.Complete` states completeness with `R.Dist`; `Reals.Analysis` adds the
+distance algebra and the two forms of limit reasoning needed by a bisection:
+pointwise-equal regular sequences have equal limits (`R.lim_congr`), and a
+sequence that converges at rate `1/(n+1)` to `x` has `x` as its limit
+(`R.lim_unique`). A `R.Nested` is a shrinking sequence of intervals: the lower
+endpoints are a regular sequence, each interval `[loₙ, hiₙ]` has width at most
+`1/(n+1)`, and the lower endpoints nest (`R.Dist (loₘ) (loₙ) ≤ 1/(m+1)`). Its
+limit is `R.lim lo`, and both endpoints are close to it (`R.Nested.lo_dist`,
+`R.Nested.hi_dist`).
+
+The IVT is split at the constructive boundary. `R.Continuous f` is pointwise
+continuity with a modulus returned as data, because the proof uses it. An
+`R.Bracket f` is a `R.Nested` together with the sign certificate a bisection
+maintains (`f(loₙ)ₖ ≤ 1/(k+1)`, `-1/(k+1) ≤ f(hiₙ)ₖ`) and the distance from the
+upper endpoints to the limit. `R.ivt_approx` proves that the limit is a zero:
+continuity at the limit plus the two one-sided bounds give `|f(x)ₖ| ≤ 3/(k+1)`,
+and regularity improves 3 to the `2/(k+1)` of `R.Dist _ 0 0`.
+
+What is deliberately not assumed is that the *bracket can be constructed* from
+`f(a) < 0 < f(b)`. That would require deciding, at each midpoint, whether
+`f(mid) ≤ 0` or `0 ≤ f(mid)`. `R.Le` is a `∀` over indices of a decidable rational
+inequality and `R.Lt` is a `Σ`; neither is total, and deriving a decision from
+`¬¬` would need Markov/choice. A classical layer could add a sign oracle and
+construct the bracket; the Bishop core does not. The approximate-sign route (test
+a rational approximation and carry a slack) avoids the oracle but is more index
+bookkeeping; it is the natural next step, and `R.ivt_approx` is already the lemma
+its limit step needs.
 
 ## The rationals
 

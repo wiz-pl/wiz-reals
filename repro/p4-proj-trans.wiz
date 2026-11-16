@@ -1,0 +1,9 @@
+-- test: check
+import Reals.Nat
+-- FINDINGS.md, P4: `.1` of a `Eq.trans` whose implicit sides are not solved yet.
+-- The minimal trigger has no `Nat` in it: an equation of booleans.
+def tB (b : Bool) (h : Bool.true = b) (k : b = Bool.false) : False :=
+  absurd (Eq.trans h k).1
+-- the shape the library hit (the original `Nat.not_succ_le_zero`)
+def tN (n : Nat) (h : Nat.Le (Nat.succ n) 0) : False :=
+  absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n)).1

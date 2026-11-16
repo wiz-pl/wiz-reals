@@ -6,9 +6,9 @@ def Int.Le (a b : Int) : Prop := Int.NonNeg (b - a)
 def Int.Lt (a b : Int) : Prop := Int.Le (a + 1) b
 
 def Int.NonNeg.congr {ω a b : Int} (e : a = b) (h : Int.NonNeg a) : Int.NonNeg b :=
-  Eq.mp' Int.NonNeg e h
+  Eq.mp' e Int.NonNeg h
 def Int.Le.congr {ω a b c d : Int} (e : a = c) (e' : b = d) (h : Int.Le a b) : Int.Le c d :=
-  Eq.mp' (fun (p : Int × Int) => Int.Le p.1 p.2) (congrArg2 (fun x y => (x, y)) e e') h
+  Eq.mp' (congrArg2 (fun x y => (x, y)) e e') (fun p => Int.Le p.1 p.2) h
 
 def Int.nonneg_ofNat (n : Nat) : Int.NonNeg (Int.ofNat n) := rfl
 def Int.not_nonneg_negSucc (n : Nat) (h : Int.NonNeg (Int.negSucc n)) : False := absurd h.1
@@ -65,7 +65,7 @@ def Nat.not_add_succ_le : (a x : Nat) → Nat.Le (a + Nat.succ x) a → False
   | .succ a, x, h => Nat.not_add_succ_le a x h
 def Int.ofPair_nonneg (a b : Nat) (h : Nat.Le b a) : Int.NonNeg (Int.ofPair a b) :=
   Int.ofPair_cases a b Int.NonNeg (fun x _ => rfl)
-    (fun x eb => absurd (Nat.not_add_succ_le a x (Eq.mp' (fun (y : Nat) => Nat.Le y a) eb h)))
+    (fun x eb => absurd (Nat.not_add_succ_le a x (Eq.mp' eb (fun y => Nat.Le y a) h)))
 -- an integer is non-negative, or its negative is positive
 def Int.nonneg_or_pos : (a : Int) → Int.NonNeg a ∨ Int.NonNeg (-a - 1)
   | .ofNat _ => Or.inl rfl

@@ -1,0 +1,18 @@
+-- test: check
+import Reals.Nat
+-- FINDINGS.md, P4. The statements are the finding's own, not weakened:
+-- the equation is given as the expected type, so `Eq.trans`'s implicit sides are solved
+-- before `.1` is elaborated (a hole ascription `: _` is enough).
+def p4 (b : Bool) (h : Bool.true = b) (k : b = Bool.false) : False :=
+  absurd (Eq.trans h k : Bool.true = Bool.false).1
+def p4_nat (n : Nat) (h : Nat.Le (Nat.succ n) 0) : False :=
+  absurd (Eq.trans (Eq.symm h) (Nat.lt_zero n) : _).1
+-- the library's form of the same workaround: a lemma whose domain *is* the equation
+def p4_lem (n : Nat) (h : Nat.Le (Nat.succ n) 0) : False :=
+  Bool.trueNeFalse (Eq.trans (Eq.symm h) (Nat.lt_zero n))
+#check p4
+#check p4_nat
+#check p4_lem
+#print axioms p4
+#print axioms p4_nat
+#print axioms p4_lem
