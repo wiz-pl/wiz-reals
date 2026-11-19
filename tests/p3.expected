@@ -1,2 +1,0 @@
-tests/p3.wiz:6:1: info: p3 : (a : Nat) → (b : Nat) → (k : Nat) → a = b → Nat.Le a (b + k) → Nat.Le b (b + k)
-tests/p3.wiz:7:1: info: Eq.mp' : {A : Type} → {a : A} → {b : A} → a = b → (0 P : A → Prop) → P a → P b

@@ -96,26 +96,24 @@ in practice because the reals only ever multiply two terms of their sequences, a
 
 ## Automation: three reflective normalisers
 
-All the algebra is done by **proof by reflection**:
+All the algebra is done by **proof by reflection** (since wiz #221 the normalisers are
+Wiz's library, so the file names below are `lib/`'s):
 
-* `nat_ring!` (src/Reals/Ring.wiz): commutative semirings at `Nat`. Expressions over
+* `nat_ring!` (lib/Ring.wiz): commutative semirings at `Nat`. Expressions over
   atoms are normalised into sorted lists of monomials; soundness is proved once.
-* `int_ring!` (src/Reals/ZRing.wiz): commutative rings at `Int`, with integer
+* `int_ring!` (lib/IntRing.wiz): commutative rings at `Int`, with integer
   coefficients. Its soundness needs the ring laws of `Int`, which are proved through
-  the pair representation (`Int.ofPair a b = a - b`, src/Reals/Int.wiz) by a slower
-  bootstrap normaliser, `int_pair_ring!` (src/Reals/IntRing.wiz), on top of
-  `nat_ring!`.
-* `q_ring!` (src/Reals/QRing.wiz): identities of rationals that hold in every
+  the pair representation (`Int.ofPair a b = a - b`, lib/IntRing.wiz) by a slower
+  bootstrap normaliser, `int_pair_ring!`, on top of `nat_ring!`.
+* `q_ring!` (lib/Rat.wiz): identities of rationals that hold in every
   commutative ring, up to `≈`. A rational expression has a numerator and a denominator
   that are integer expressions in its atoms' numerators and denominators; `lhs ≈ rhs`
   is one integer identity.
 
-They are term macros, not tactics, because tactics can't read an equation
-(FINDINGS.md, G1): `int_ring! a * (b + c) = a * b + a * c` repeats the equation it
-proves. They expand to `P.proveAt lhs rhs ρ e₁ e₂ rfl rfl rfl` (the type is the
-equation as written; the `rfl`s check that the reified expressions evaluate to the
-sides and that the normal forms agree), compare normal forms with a Boolean function
-rather than `rfl` at a list type (S2), and avoid ascriptions (S3).
+A term macro sees only its own syntax, so `nat_ring! lhs = rhs` repeats the equation it
+proves. Where the equation is the goal, `by ring` (lib/RingTactic.wiz, wiz #227) reads
+the goal instead; what is left of the macros here is the equations that are *arguments*
+to a congruence (an `Int.Le.congr`, a `Q.lt_congr`, …), which no tactic can fill.
 
 Chains of inequalities are written with every intermediate term spelled out
 (`Q.chain a b c h₁ h₂`): letting the elaborator infer them is slow, and a mistake in

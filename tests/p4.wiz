@@ -1,5 +1,5 @@
 -- test: check
-import Reals.Nat
+import Nat
 -- FINDINGS.md, P4. The statements are the finding's own, not weakened:
 -- the equation is given as the expected type, so `Eq.trans`'s implicit sides are solved
 -- before `.1` is elaborated (a hole ascription `: _` is enough).

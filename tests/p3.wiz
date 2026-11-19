@@ -1,7 +1,0 @@
-import Reals.Nat
--- FINDINGS.md P3: a bare `fun x => …` motive, with the equation before the motive.
--- The statement is the one from the finding; it is not weakened.
-def p3 (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
-  Eq.mp' e (fun x => Nat.Le x (b + k)) h
-#check p3
-#check Eq.mp'

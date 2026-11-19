@@ -1,3 +1,4 @@
+import RingTactic
 import Reals.Complete
 import Reals.RealOrder
 -- ## The analysis layer: distances, limits, and the bisection lemma
@@ -34,7 +35,7 @@ def R.dist_triangle (x y z : R) (e e' : Q)
       (q_ring! e + (Q.invS k + Q.invS k) + (e' + (Q.invS k + Q.invS k))
          ≈ e + e' + 4 * Q.invS k))
 
-def Q.neg_sub (a b : Q) : -a - -b ≈ -(a - b) := q_ring! -a - -b ≈ -(a - b)
+def Q.neg_sub (a b : Q) : -a - -b ≈ -(a - b) := by ring
 
 -- Negation preserves distances.
 def R.dist_neg {ω x y : R} {ω e : Q} (h : R.Dist x y e) : R.Dist (-x) (-y) e := fun k =>
@@ -192,7 +193,7 @@ def R.dist_lower {ω x y : R} {ω e : Q} (h : R.Dist x y e) (k : Nat) :
       (Q.neg_le_of_abs_le (h k)))
 
 def R.zero_seq (k : Nat) : (0 : R).seq k ≈ (0 : Q) := rfl
-def Q.sub_zero (a : Q) : a - 0 ≈ a := q_ring! a - 0 ≈ a
+def Q.sub_zero (a : Q) : a - 0 ≈ a := by ring
 
 -- A pointwise bound `|xₖ| ≤ 3/(k+1)` gives `x ≈ 0` (regularity improves 3 to 1).
 def R.dist_zero_of_three_invS (x : R)
@@ -239,9 +240,9 @@ structure R.Bracket (f : R → R) where
   lo_sign : (n k : Nat) → (f (nested.lo n)).seq k ≤ Q.invS k
   hi_sign : (n k : Nat) → -(Q.invS k) ≤ (f (nested.hi n)).seq k
 
-def Q.add_neg_sub (a b : Q) : a + -b ≈ a - b := q_ring! a + -b ≈ a - b
-def Q.neg_add_sub (a b : Q) : -a + -b ≈ -a - b := q_ring! -a + -b ≈ -a - b
-def Q.pack_sub (a b : Q) : a + (b + (a + a)) ≈ b + 3 * a := q_ring! a + (b + (a + a)) ≈ b + 3 * a
+def Q.add_neg_sub (a b : Q) : a + -b ≈ a - b := by ring
+def Q.neg_add_sub (a b : Q) : -a + -b ≈ -a - b := by ring
+def Q.pack_sub (a b : Q) : a + (b + (a + a)) ≈ b + 3 * a := by ring
 def Q.neg_sub_pack (a b : Q) : -a - (b + (a + a)) ≈ -(b + 3 * a) :=
   q_ring! -a - (b + (a + a)) ≈ -(b + 3 * a)
 

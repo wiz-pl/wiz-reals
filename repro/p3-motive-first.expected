@@ -1,4 +1,4 @@
-repro/p3-motive-first.wiz:10:50: error: type mismatch
-  expected: ?m9 a b k e h a
+repro/p3-motive-first.wiz:9:50: error: type mismatch
+  expected: ?m15 a b k e h a
   inferred: Nat.Le a (b + k)
-  (a variable escapes the scope of the hole being solved)
+  (a variable escapes the scope of the hole being solved (the hole was made outside a binder that its solution would mention; a type annotation on that binder may help))

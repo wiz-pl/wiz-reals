@@ -1,5 +1,5 @@
 -- test: check
-import Reals.Nat
+import Nat
 -- FINDINGS.md, P4: `.1` of a `Eq.trans` whose implicit sides are not solved yet.
 -- The minimal trigger has no `Nat` in it: an equation of booleans.
 def tB (b : Bool) (h : Bool.true = b) (k : b = Bool.false) : False :=

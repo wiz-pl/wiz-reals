@@ -1,4 +1,4 @@
-import Reals.QLaws
+import RingTactic
 -- The rationals `1/(n+1)` and what regular sequences need of them.
 
 def Q.invS (n : Nat) : Q := Q.mk 1 (Int.ofNat (Nat.succ n)) (Int.ofNat_succ_pos n)
@@ -9,7 +9,7 @@ def Q.invS_nonneg (n : Nat) : 0 ≤ Q.invS n := Q.le_of_lt (Q.invS_pos n)
 def Int.ofNat_le (m n : Nat) (h : Nat.Le m n) : Int.Le (Int.ofNat m) (Int.ofNat n) :=
   Int.NonNeg.congr
     (Eq.symm (Eq.trans (congrArg2 (fun x y => x - y) (Int.ofNat_pair n) (Int.ofNat_pair m)) (Int.ofPair_sub n 0 m 0)))
-    (Int.ofPair_nonneg (n + 0) (0 + m) (Eq.mpr' (Nat.add_zero n) (fun z => Nat.Le m z) h))
+    (Int.ofPair_nonneg (n + 0) (0 + m) (Eq.mpr' (fun (z : Nat) => Nat.Le m z) (Nat.add_zero n) h))
 -- `1/(n+1) ≤ 1/(m+1)` when `m ≤ n`
 def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
   Int.Le.congr (int_ring! Int.ofNat (Nat.succ m) = 1 * Int.ofNat (Nat.succ m)) (int_ring! Int.ofNat (Nat.succ n) = 1 * Int.ofNat (Nat.succ n))
@@ -18,12 +18,12 @@ def Q.invS_anti (m n : Nat) (h : Nat.Le m n) : Q.invS n ≤ Q.invS m :=
 -- decreasing
 def Q.invS_le_add (n k : Nat) : Q.invS (n + k) ≤ Q.invS n :=
   Q.invS_anti n (n + k) (Nat.le_add_right n k)
-def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.le_zero n)
+def Q.invS_le_one (n : Nat) : Q.invS n ≤ 1 := Q.invS_anti 0 n (Nat.zero_le n)
 
 -- `1/(m+n+1) ≤ 1/(m+1) + 1/(n+1)`: the sum form needed when a triangle
 -- inequality is re-indexed at a common index.
-def Nat.succ_add_eq (m n : Nat) : Nat.succ m + n = m + n + 1 := nat_ring! Nat.succ m + n = m + n + 1
-def Nat.add_succ_eq (m n : Nat) : m + Nat.succ n = m + n + 1 := nat_ring! m + Nat.succ n = m + n + 1
+def Nat.succ_add_eq (m n : Nat) : Nat.succ m + n = m + n + 1 := by ring
+def Nat.add_succ_eq (m n : Nat) : m + Nat.succ n = m + n + 1 := by ring
 def Nat.den_succ_eq (m n : Nat) : (m + n + 1) + 1 = Nat.succ n + Nat.succ m :=
   nat_ring! (m + n + 1) + 1 = Nat.succ n + Nat.succ m
 -- `(m+1)(n+1) ≤ (m+n+1)² ≤ ((n+1)+(m+1))(m+n+1)`
@@ -32,15 +32,15 @@ def Nat.mul_le_invS_den' (m n : Nat) :
   let s := m + n + 1;
   Nat.le_trans ((Nat.succ m) * (Nat.succ n)) (s * s) (((Nat.succ n) + (Nat.succ m)) * (m + n + 1))
     (Nat.mul_le_mul (Nat.succ m) s (Nat.succ n) s
-      (Eq.mp' (Nat.succ_add_eq m n) (fun z => Nat.Le (Nat.succ m) z) (Nat.le_add_right (Nat.succ m) n))
-      (Eq.mp' (Nat.add_succ_eq m n) (fun z => Nat.Le (Nat.succ n) z) (Nat.le_add_left (Nat.succ n) m)))
-    (Eq.mp' (congrArg (fun x => x * s) (Nat.den_succ_eq m n))
-      (fun z => Nat.Le (s * s) z)
+      (Eq.mp' (fun (z : Nat) => Nat.Le (Nat.succ m) z) (Nat.succ_add_eq m n) (Nat.le_add_right (Nat.succ m) n))
+      (Eq.mp' (fun (z : Nat) => Nat.Le (Nat.succ n) z) (Nat.add_succ_eq m n) (Nat.le_add_left (Nat.succ n) m)))
+    (Eq.mp' (fun (z : Nat) => Nat.Le (s * s) z)
+      (congrArg (fun x => x * s) (Nat.den_succ_eq m n))
       (Nat.mul_le_mul_right s s (s + 1) (Nat.le_add_right s 1)))
 def Nat.mul_le_invS_den (m n : Nat) :
     Nat.Le ((Nat.succ m) * (Nat.succ n)) (((Nat.succ n) + (Nat.succ m)) * Nat.succ (m + n)) :=
-  Eq.mp' (congrArg (fun x => ((Nat.succ n) + (Nat.succ m)) * x) (Nat.add_one (m + n)))
-    (fun z => Nat.Le ((Nat.succ m) * (Nat.succ n)) z) (Nat.mul_le_invS_den' m n)
+  Eq.mp' (fun (z : Nat) => Nat.Le ((Nat.succ m) * (Nat.succ n)) z)
+    (congrArg (fun x => ((Nat.succ n) + (Nat.succ m)) * x) (Nat.add_one (m + n))) (Nat.mul_le_invS_den' m n)
 def Q.invS_add_le (m n : Nat) : Q.invS (m + n) ≤ Q.invS m + Q.invS n :=
   Int.Le.congr
     (Eq.trans rfl (int_ring! Int.ofNat (Nat.succ m) * Int.ofNat (Nat.succ n)
@@ -50,9 +50,9 @@ def Q.invS_add_le (m n : Nat) : Q.invS (m + n) ≤ Q.invS m + Q.invS n :=
     (Int.ofNat_le _ _ (Nat.mul_le_invS_den m n))
 
 -- strict decrease in the index
-def Int.one_mul' (a : Int) : 1 * a = a := int_ring! 1 * a = a
-def Int.one_mul'' (a : Int) : a = 1 * a := int_ring! a = 1 * a
-def Int.add_one_mul' (a : Int) : a + 1 = 1 * a + 1 := int_ring! a + 1 = 1 * a + 1
+def Int.one_mul' (a : Int) : 1 * a = a := by ring
+def Int.one_mul'' (a : Int) : a = 1 * a := by ring
+def Int.add_one_mul' (a : Int) : a + 1 = 1 * a + 1 := by ring
 def Int.ofNat_add_one (n : Nat) : Int.ofNat (n + 1) = Int.ofNat (Nat.succ n) :=
   congrArg Int.ofNat (Nat.add_one n)
 def Q.invS_lt (m n : Nat) (h : Nat.Lt m n) : Q.invS n < Q.invS m :=

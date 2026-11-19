@@ -1,3 +1,4 @@
+import RingTactic
 import Reals.RealMul
 -- Order on the reals.
 --
@@ -205,7 +206,7 @@ def R.nonneg_congr {ω p q : R} (h : p ≈ q) (hp : R.NonNeg p) : R.NonNeg q := 
       (Q.add_le_add (R.nonneg_seq p hp s) hneg))
 
 
-def Q.neg_add' (a b : Q) : -(a + b) ≈ -a + -b := q_ring! -(a + b) ≈ -a + -b
+def Q.neg_add' (a b : Q) : -(a + b) ≈ -a + -b := by ring
 
 
 def R.nonneg_add {ω x y : R} (hx : R.NonNeg x) (hy : R.NonNeg y) : R.NonNeg (x + y) := fun n =>
@@ -222,7 +223,7 @@ def R.nonneg_add {ω x y : R} (hx : R.NonNeg x) (hy : R.NonNeg y) : R.NonNeg (x 
 
 def Q.sub_add_sub (a b c d : Q) : (a - c) + (b - d) ≈ (a + b) - (c + d) :=
   q_ring! (a - c) + (b - d) ≈ (a + b) - (c + d)
-def Q.two_mul (a : Q) : 2 * a ≈ a + a := q_ring! 2 * a ≈ a + a
+def Q.two_mul (a : Q) : 2 * a ≈ a + a := by ring
 def Q.two_invS_three_le (n : Nat) : 2 * Q.invS (R.nonnegIdx n) ≤ Q.invS n :=
   Q.le_congr (Q.refl _) (Q.invS_three n)
     (Q.mul_le_mul_of_nonneg_right (Q.invS (R.nonnegIdx n)) (Q.invS_nonneg (R.nonnegIdx n))

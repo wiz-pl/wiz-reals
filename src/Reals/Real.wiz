@@ -1,3 +1,4 @@
+import RingTactic
 import Reals.QSeq
 -- The real numbers: regular sequences of rationals (Bishop), up to `≈`.
 --
@@ -32,7 +33,7 @@ def R.eq_of_bound (x y : R) (k : Nat)
     let C := Q.invS n + Q.invS m + (Q.ofNat k * Q.invS m + (Q.invS m + Q.invS n));
     let D' := Q.invS n + Q.invS n + (Q.ofNat k + 2) * Q.invS m;
     let D := Q.invS n + Q.invS n + Q.ofNat (k + 2) * Q.invS m;
-    let eCD' : C ≈ D' := q_ring! Q.invS n + Q.invS m + (Q.ofNat k * Q.invS m + (Q.invS m + Q.invS n)) ≈ Q.invS n + Q.invS n + (Q.ofNat k + 2) * Q.invS m;
+    let eCD' : C ≈ D' := by ring;
     let eD'D : D' ≈ D := Q.add_congr (Q.refl (Q.invS n + Q.invS n)) (Q.mul_congr (Q.symm (Q.ofNat_add2 k)) (Q.refl (Q.invS m)));
     @Q.le_trans (Q.abs (x.seq n - y.seq n)) B D (Q.abs_sub_le3 (x.seq n) (x.seq m) (y.seq m) (y.seq n))
       (@Q.le_trans B C D (Q.add_le_add3 (x.reg n m) (h m) (y.reg m n)) (Q.le_of_eq (Q.trans eCD' eD'D))))

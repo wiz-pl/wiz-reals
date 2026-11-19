@@ -2,7 +2,7 @@
 
 What building the real numbers in Wiz showed about the language, its kernel, its
 elaborator, its tactics and its tooling, as of the toolchain in `wiz-toolchain`
-(master `50cd3e7`, 2026-11-12). Each entry says what happened, a minimal reproducer,
+(master `4ad29792`, 2026-11-18). Each entry says what happened, a minimal reproducer,
 and what this project does instead. Severity:
 
 * **bug**: wrong behaviour;
@@ -12,17 +12,24 @@ and what this project does instead. Severity:
 * **slow**: correct but slow (timings are wall-clock under `light` on a shared
   machine: approximate, not measurements).
 
-## Status at the pinned toolchain (2026-11-14)
+## Status at the pinned toolchain (2026-11-18)
 
-`wiz-toolchain` names master `50cd3e7`. At that commit: **P3** is fixed here (`Eq.mp'`
-takes the equation before the motive, `tests/p3.wiz`); **P4** is reproduced with a
-minimal trigger (`repro/p4-proj-trans.wiz`) and worked around (`tests/p4.wiz`); **P5**
-is the pin itself (`50cd3e7` has a release snapshot); **P11** is fixed by wiz #202
+`wiz-toolchain` names master `4ad29792` (the same commit as `flake.nix`/`flake.lock`).
+This project's arithmetic modules were upstreamed in wiz #221, so the local copies are
+gone: `src/Reals/{Nat,Order,Ring,Int,IntRing,ZRing,IntOrder,Rat,QRing,QLaws}.wiz` were
+deleted and the rest imports `lib/` (`Nat.le_zero` is `Nat.zero_le`, `Nat.sub_add_of_le`
+is `Nat.add_sub_of_le`).
+
+At that commit: **P3** is still open — `lib/`'s `Eq.mp'`/`Eq.mpr'` take the motive
+before the equation, so a bare `fun x => …` fails; every use annotates its binder, and
+`tests/p3.wiz` is gone (`repro/p3-motive-first.wiz` pins the error). **P4** is
+reproduced with a minimal trigger (`repro/p4-proj-trans.wiz`) and worked around
+(`tests/p4.wiz`); **P5**: this pin has a release snapshot; **P11** is fixed by wiz #202
 (`tests/sqrt2.expected` prints `≈ 2`). B2, P1, P2, P7, P10 and S2 are unchanged.
 
 ## Gaps
 
-### G1. Tactics can't read an equation
+### G1. Tactics can't read an equation (fixed by wiz #197; `by ring` in #227)
 
 `TacticM.goalType` reflects `a = b` as `Expr.opaque _` (the reflected `Expr` has no
 constructor for the kernel's equality; Prelude: "Kernel forms with no constructor here
@@ -47,25 +54,22 @@ def t1 (a b : Nat) : a + b = a + b := by
   exact rfl
 ```
 
-Here: the decision procedures are **term macros** that reify the *syntax* of an
-equation the user writes out again: `nat_ring! (a + b) * c = a * c + b * c`
-(src/Reals/Ring.wiz) and `int_ring! …` (src/Reals/IntRing.wiz). The macro expands to
-`(NE.prove ρ e₁ e₂ rfl : lhs = rhs)`, so the kernel checks the ascription by
-conversion. It works well, but the equation has to be written twice (once in the
-statement, once in the proof), and atoms are compared syntactically (`f x` and
-`f (x)` are two atoms).
-Wanted: `Expr.eq A a b` in the reflected terms (and in `Expr.view`).
+This project used to carry **term macros** that reify the *syntax* of an equation the
+user wrote out again. `TacticM.goalType` now reflects an equation (`TacticM.eqView`),
+and `by ring` (lib/RingTactic.wiz) reads the goal, so the normalisers live in lib
+(lib/Ring.wiz, lib/IntRing.wiz, lib/Rat.wiz) and the macros are only used where the
+equation is an *argument* to a congruence, which no tactic can fill.
 
-### G2. No arithmetic library: everything from `0` and `succ`
+### G2. No arithmetic library: everything from `0` and `succ` (upstreamed in wiz #221)
 
 lib/ has `Int` with five lemmas, no `Rat`, no order on `Nat` or `Int` as a
 proposition, no `≤`/`<` notation, and no `ring`/`omega`/`linarith`/`simp`. Before the
 first fact about rationals this project had to write: the commutative semiring laws of
-`Nat` and its order (src/Reals/Nat.wiz), a reflective normaliser for commutative
-semirings with its soundness proof (src/Reals/Ring.wiz), the ring laws of `Int`
-through the pair representation (src/Reals/Int.wiz), a reflective normaliser for `Int`
-on top of the one for `Nat` (src/Reals/IntRing.wiz) and the order of `Int`
-(src/Reals/IntOrder.wiz). Upstream candidates: all of these (generic and checked).
+`Nat` and its order (lib/Nat.wiz), a reflective normaliser for commutative
+semirings with its soundness proof (lib/Ring.wiz), the ring laws of `Int`
+through the pair representation (lib/IntRing.wiz), a reflective normaliser for `Int`
+on top of the one for `Nat` (lib/IntRing.wiz) and the order of `Int`
+(lib/IntOrder.wiz). Upstream candidates: all of these (generic and checked).
 
 ## Bugs
 
@@ -102,7 +106,7 @@ All of `q` is a proof, so it is erased anyway; CoreSpec §11.5 already says quan
 don't matter in a Π that is a proposition. The elaborator lets it through and the
 kernel rejects the finished declaration, so the message points at the declaration,
 not at the use. Here: `{ω m n k : Nat}` on lemmas that use their implicits
-(src/Reals/Nat.wiz `Nat.add_right_cancel`, src/Reals/IntOrder.wiz `Int.NonNeg.congr`),
+(lib/Nat.wiz `Nat.add_right_cancel`, lib/IntOrder.wiz `Int.NonNeg.congr`),
 and transport motives taken at quantity 0.
 
 ### B3. `Nat.toString` fails on numbers of 2^64 and above
@@ -136,8 +140,8 @@ def Int.abs_sub_comm (a b : Int) : Int.abs (a - b) = Int.abs (b - a) :=
 ```
 
 Same with `Nat.succ n * 1 = Nat.succ n` (it is `n * 1 = n`). Here:
-`@Eq.trans Int x y z p q` with the three sides written out (src/Reals/IntOrder.wiz,
-src/Reals/Ring.wiz `Poly.eval_const`).
+`@Eq.trans Int x y z p q` with the three sides written out (lib/IntOrder.wiz,
+lib/Ring.wiz `Poly.eval_const`).
 
 ### P2. A failed definition turns into confusing errors downstream
 
@@ -146,14 +150,14 @@ When `Key.insertB` fails to check, every later use reports
 makes `Nat.add_left_cancel k h` report `no field 'add_left_cancel' in a value of type
 Type` (the name falls back to field access on the type `Nat`).
 
-### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit (fixed here)
+### P3. `fun x => …` for an argument `P : A → Prop` with `A` implicit (still open)
 
 `Eq.mp' (fun x => Nat.Le x (b + k)) e h` fails with "a variable escapes the scope of
 the hole being solved" (an earlier toolchain reported "unification problem is outside
 the pattern fragment"). The same shape in a helper of its own:
 
 ```
-import Reals.Nat
+import Nat
 def Eq.mpMotiveFirst {A : Type} {a b : A} (0 P : A → Prop) (e : a = b) (h : P a) : P b :=
   Eq.substProp P e h
 def t (a b k : Nat) (e : a = b) (h : Nat.Le a (b + k)) : Nat.Le b (b + k) :=
@@ -170,15 +174,17 @@ extended context (`?m9 a b k e h a`), and the solution mentions a variable outsi
 the hole's scope. With the *equation* first, `?A` is solved from `e` before the
 motive is elaborated, so a bare lambda works.
 
-Here: `Eq.mp'`/`Eq.mpr'` take the equation before the motive, and every use writes a
-bare `fun x => …` (src/Reals/{Nat,Int,IntOrder,Isqrt,QLaws,QRing,QSeq,Sqrt2}.wiz).
-tests/p3.wiz is the finding's statement with the fixed proof;
-repro/p3-motive-first.wiz pins the error above, so the general elaborator issue stays
-visible and a fix in Wiz will show up as that test failing. Where the equation's type is
-itself a computed equation (at `Q`, a structure), the arguments stay explicit
-(`@Eq.mp' Q p q e …` in `Q.ofEq`): the equation first would have to unify the computed
-Σ with an equation whose sides are still holes. The general fix is to postpone an
-argument whose domain mentions a postponed placeholder.
+At this pin lib's `Eq.mp'`/`Eq.mpr'` (lib/Nat.wiz) take the motive first, which is the
+failing order, so every use in the reals annotates the binder:
+`Eq.mp' (fun (z : Nat) => …) e h` (src/Reals/{Isqrt,QSeq,Sqrt2}.wiz). That was the
+one place the project's own `Eq.mp'` (equation first, now upstream with the other
+order) made bare lambdas work; this repository has no `tests/p3.wiz` any more.
+`repro/p3-motive-first.wiz` pins the error above, so a fix in Wiz shows up as that test
+failing. Where the equation's type is itself a computed equation (at `Q`, a structure),
+the arguments stay explicit (`@Eq.mp' Q p q …` in lib/Rat.wiz `Q.ofEq`): the equation
+first would have to unify the computed Σ with an equation whose sides are still holes.
+The general fix is to postpone an argument whose domain mentions a postponed
+placeholder.
 
 ### P4. Projections of an unsolved equation (reproduced; workaround)
 
@@ -206,26 +212,24 @@ quotes the inferred type (`quote` zonks the spine) before the body is checked.
 Here: the equation is given as the expected type — an ascription (`(… : Bool.true =
 Bool.false)`, or a hole `: _`), or a lemma whose domain is that equation, which is what
 lib/Logic.wiz's `Bool.trueNeFalse` does (`Bool.trueNeFalse (Eq.trans (Eq.symm h) (Nat.lt_zero n))`,
-src/Reals/Nat.wiz `Nat.not_succ_le_zero`). tests/p4.wiz proves the finding's statements
+lib/Nat.wiz `Nat.not_succ_le_zero`). tests/p4.wiz proves the finding's statements
 with each form; no statement is weakened. A fix in Wiz would be to zonk the inferred
 type (or solve the application's pending sides) before matching the head in `term.proj`.
 
-### P5. No release snapshot of the newest master
+### P5. No release snapshot of the newest master (this pin has one)
 
-Most of the newest master commits have no release snapshot, so `wiz-toolchain` cannot
-name them: tower fails with a 404 and lists the retained snapshots. `50cd3e7` is the
-newest commit with one on 2026-11-14 (the `wiz-cats` repository and the codex cross-check
-use the same commit). The project pinned `183f823` before this; that pin also had a
-snapshot, but is older than the fix that `wiz-cats` needs.
+Not every master commit has a release snapshot, so `wiz-toolchain` cannot always name
+the newest one: tower fails with a 404 and lists the retained snapshots. `4ad29792` has
+one (2026-11-18), so the pin is installable with tower's release source.
 
-### P8. `|>` only pipes data
+### P8. `|>` only pipes data (fixed in wiz #239)
 
 `pipe {A B : Type}`, so `h |> fun h => …` with `h` a proof fails with "universe level
 mismatch: 1 vs 0". Proof terms are written inside out.
 
 ### P9. A failing module's errors are repeated inside every importer's error
 
-When src/Reals/Ring.wiz had one error, checking src/Reals/QLaws.wiz (six imports
+When lib/Ring.wiz had one error, checking lib/Rat.wiz (six imports
 further) printed one line per importer, each containing the whole nested list of
 the errors below it: several kilobytes of `module Reals.X has errors: [module
 Reals.Y has errors: [...]]` and the 'no field' cascades of P2, for one typo.
@@ -246,7 +250,7 @@ lemma whose type is the integer equation written out, proved by
 
 `#check R.sqrt2_sq` used to print `R.sqrt2 * R.sqrt2 ≈ OfNat.ofNat R 2 (instOfNatRN 2)`;
 at `Nat` and `Int` numerals already printed as numerals. At the pinned toolchain
-(`50cd3e7`, which has #202) it prints `≈ 2`, and tests/sqrt2.expected records that.
+(`4ad29792`, which has #202) it prints `≈ 2`, and tests/sqrt2.expected records that.
 
 ### P12. Partially applied recursive calls
 
@@ -279,14 +283,14 @@ useful; the workaround is cheap and keeps every proof checked.
 ### S1. A unification failure under a binder takes 17–80 s
 
 ```
-import Reals.Int
+import IntRing
 def r (a b c d : Nat) : Int.ofPair a b + -(Int.ofPair c d) = Int.ofPair (a + d) (b + c) :=
   Eq.trans (congrArg (fun y => Int.ofPair _ _ + y) (Int.ofPair_negate _ _)) (Int.ofPair_add _ _ _ _)
 ```
 
 fails after 17 s ("outside the pattern fragment": the holes under `fun y` become
 `?m a b c d y`). The same shape in the `.sub` case of `IE.sound`
-(src/Reals/IntRing.wiz, first version) took 80 s to fail. Writing the arguments out (a
+(lib/IntRing.wiz, first version) took 80 s to fail. Writing the arguments out (a
 lemma `Int.ofPair_sub`) makes the whole file check in about 3 s, so the time goes into
 the failure, probably into unfolding `Int.ofPair` (a `match` on `Nat.sub`) while
 trying to unify.
@@ -314,13 +318,13 @@ def chk : sort (mk 36) = List.append (sort (mk 36)) .nil := rfl
 N = 12: 0.4 s; N = 24: 4.9 s; N = 36: killed by `light` at 2 GB. The same check
 through a Boolean `lbeq (sort (mk 36)) (…) = .true := rfl` takes 0.5 s. This is how
 the reflective provers first compared normal forms (`rfl : norm a = norm b`): an
-identity with 36 monomials ran out of memory. Here: `Poly.beq`/`ZPoly.beq` and a
-soundness lemma (`Poly.beq_eval`), in src/Reals/Ring.wiz and src/Reals/ZRing.wiz.
+identity with 36 monomials ran out of memory. Here: `NatPoly.beq`/`IntPoly.beq` and a
+soundness lemma (`NatPoly.beq_eval`), in lib/Ring.wiz and lib/IntRing.wiz.
 
 ### S3. The same proof is 8× slower under an ascription
 
 ```
-import Reals.QRing
+import Rat
 -- 1.3 s:
 def xI (p q r : Q) : p + q + r ≈ p + (q + r) :=
   QE.prove (List.cons p (List.cons q (List.cons r List.nil)))
@@ -336,7 +340,7 @@ It looks as if, when the term is elaborated first and its type
 `QE.eval ρ e₁ ≈ QE.eval ρ e₂` is then unified with the stated type, the elaborator's
 unifier unfolds the evaluator very inefficiently, while the kernel (which checks both
 versions) is fast. Here: the macros emit the bare proof, so they are only used where
-the equation is the expected type (src/Reals/Ring.wiz, `Reify.expandWith`).
+the equation is the expected type (lib/Ring.wiz, `Reify.expandWith`).
 
 ### P6. `let a := …; let b := …;` on one line ends the term
 
@@ -376,11 +380,34 @@ contains the recursive call. Proving a lemma about it by giving the lemma about 
 definition of its own, `Isqrt.body n g lo hi` with the recursive call as the argument
 `g`, made the same proof check in under a second (src/Reals/Isqrt.wiz).
 
+### S6. A `Nat` recursion over big values is ~100× slower at master `4ad29792` (blocks the √2 tests)
+
+The same Prelude-only bisection loop as `src/Reals/Isqrt.wiz` (`mid`/`stop`/`step`/
+`body`/`go`, fuel 100, returning `Nat.pow 10 12`):
+
+```
+def t : go 1000000000000000000000000 100 0 1000000000000000000000001 = 1000000000000 := rfl
+```
+
+checks in 1 s on `50cd3e7` and 134 s on `4ad29792`; at `n = 10^40` (the size the √2
+digits need, `isqrt (2 · 10^40)`) it exceeds 300 s, while the whole of
+`tests/sqrt2.wiz` took 6 s on `50cd3e7`. On the new pin, the same loop with fuel 100
+takes 0 s at `n = 10^12`, 2 s at `10^18` and 134 s at `10^24`, so the cost grows with
+the *numbers*, not the iteration count (the loop converges in about 40–80 rounds).
+`Nat.div`, `Nat.lt` and `Nat.le` on the same big numbers, and a single `mid` call, are
+each fast in isolation, and the compiled test `tests/digits.wiz` (which runs
+`Sqrt2.d (10^20)`) passes, so the cost is in kernel evaluation of the recursion.
+
+Consequence at this pin: `tests/sqrt2.wiz` times out (300 s) and `app/sqrt2.wiz`
+times out its build job (1800 s). Everything else checks and tests green. The pin is
+kept for the rest of the bump, but this repository's √2 test cannot pass on
+`4ad29792` until the toolchain's evaluation of the loop returns to its old cost.
+
 ## How long things take
 
 On this machine, under `light`/`heavy` (approximate): every module checks in 1–16 s
 once written correctly; `grail build` from scratch about 95 s, most of it the
-reflective `rfl`s of `q_ring!` in src/Reals/QLaws.wiz and the reals. A single
+reflective `rfl`s of `q_ring!` in lib/Rat.wiz and the reals. A single
 `q_ring!` identity with four atoms takes about 1 s (S3 explains why not 20 s).
 The cost of writing is dominated by S4: a wrong step is a timeout, not an error.
 
