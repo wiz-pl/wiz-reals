@@ -403,6 +403,12 @@ times out its build job (1800 s). Everything else checks and tests green. The pi
 kept for the rest of the bump, but this repository's √2 test cannot pass on
 `4ad29792` until the toolchain's evaluation of the loop returns to its old cost.
 
+The same probe (`n = 10^24`, fuel 100) at the retained snapshots: `50cd3e7` 0 s,
+`aeaa34ef` 1 s, `80dcd078` 2 s, `b4df26ea` 1 s, then `c9a42e55` and `677b6496` over
+70 s (killed). The change is in `b4df26ea..c9a42e55` (2026-11-15 11:25–16:32), the
+range that contains #256 (`68dbd060`, kernel: memoise unfoldings) and the other
+evaluator/cache commits of that afternoon.
+
 ## How long things take
 
 On this machine, under `light`/`heavy` (approximate): every module checks in 1–16 s
